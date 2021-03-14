@@ -532,7 +532,7 @@ static uint32_t find_caller(EOSState *s, uint32_t pc, uint32_t *psp)
 
     // FIXME SJE, so much FIXME.
     // Currently the backtrace handling causes an exception...
-    #ifdef CONFIG_200D
+    #ifdef CONFIG_DIGIC_78
     return 0;
     #endif
 

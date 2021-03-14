@@ -118,6 +118,15 @@ inline uint8_t* BMP_VRAM_START(uint8_t* bmp_buf) { return bmp_buf; }
 
 #else // dryos
 
+#ifdef CONFIG_DIGIC_VIII
+#define BMP_W_PLUS 904
+#define BMP_W_MINUS -120
+#define BMP_H_PLUS 652
+#define BMP_H_MINUS -30
+
+#define BMPPITCH 1024
+#define BMP_VRAM_SIZE (1024*682)
+#else
 #define BMP_W_PLUS 840
 #define BMP_W_MINUS -120
 #define BMP_H_PLUS 510
@@ -125,7 +134,7 @@ inline uint8_t* BMP_VRAM_START(uint8_t* bmp_buf) { return bmp_buf; }
 
 #define BMPPITCH 960
 #define BMP_VRAM_SIZE (960*540)
-
+#endif
 #define BMP_HDMI_OFFSET ((-BMP_H_MINUS)*BMPPITCH + (-BMP_W_MINUS))
 
 // BMP_VRAM_START and BMP_VRAM_START are not generic - they only work on BMP buffer addresses returned by Canon firmware

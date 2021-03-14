@@ -141,7 +141,7 @@ void bmp_idle_copy(int direction, int fullsize)
     }
 }
 
-#ifdef CONFIG_200D // maybe CONFIG_DIGIC_678?  Untested
+#ifdef CONFIG_DIGIC_78 // maybe CONFIG_DIGIC_678?  Untested
 static uint32_t indexed2uyvyLUT[COLOR_ORANGE + 1] = {
     0x00800080, // COLOR_EMPTY (black, but we will apply alpha later)
     0xff80ff80, // COLOR_WHITE

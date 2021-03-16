@@ -1744,7 +1744,9 @@ int handle_tricky_canon_calls(struct event * event)
             #endif
             break;
         case MLEV_REDRAW:
+            #ifndef CONFIG_R //redraw crashes R in current state
             _redraw_do();   /* todo: move in gui-common.c */
+            #endif
             break;
     }
     

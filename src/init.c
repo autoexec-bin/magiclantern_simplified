@@ -38,6 +38,7 @@
 #include "ml-cbr.h"
 #include "backtrace.h"
 
+
 #if defined(FEATURE_GPS_TWEAKS)
 #include "gps.h"
 #endif
@@ -50,6 +51,7 @@ static int _hold_your_horses = 1; // 0 after config is read
 int ml_started = 0; // 1 after ML is fully loaded
 int ml_gui_initialized = 0; // 1 after gui_main_task is started 
 
+
 /**
  * Called by DryOS when it is dispatching (or creating?)
  * a new task.
@@ -61,78 +63,27 @@ my_task_dispatch_hook(
         struct task * next_task_new         /* only present on new DryOS; old versions use HIJACK_TASK_ADDR */
 )
 {
-    struct task * next_task = 
-        #ifdef CONFIG_NEW_DRYOS_TASK_HOOKS
-        next_task_new;
-        #else
-        *(struct task **)(HIJACK_TASK_ADDR);
-        #endif
-
-/* very verbose; disabled by default */
-#undef DEBUG_TASK_HOOK
-#ifdef DEBUG_TASK_HOOK
-#ifdef CONFIG_NEW_DRYOS_TASK_HOOKS
-    /* new DryOS */
-    qprintf("[****] task_hook(%x) %x(%s) -> %x(%s), from %x\n",
-        p_context_old,
-        prev_task_unused, prev_task_unused ? prev_task_unused->name : "??",
-        next_task, next_task ? next_task->name : "??",
-        read_lr()
-    );
-#else
-    /* old DryOS */
-    qprintf("[****] task_hook(%x) -> %x(%s), from %x\n",
-        p_context_old,
-        next_task, next_task ? next_task->name : "??",
-        read_lr()
-    );
-#endif  /* CONFIG_NEW_DRYOS_TASK_HOOKS */
-#endif  /* DEBUG_TASK_HOOK */
+    struct task * next_task =  next_task_new;
 
     if (!next_task)
         return;
 
-#ifdef CONFIG_NEW_DRYOS_TASK_HOOKS
-    /* on new DryOS, first argument is not context; get it from the task structure */
-    /* this also works for some models with old-style DryOS, but not all */
     struct context * context = next_task->context;
-#else
-    /* on old DryOS, context is passed as argument
-     * on some models (not all!), it can be found in the task structure as well */
-    struct context * context = p_context_old ? (*p_context_old) : 0;
-#endif
-
-    if (!context)
-        return;
-    
-#ifdef CONFIG_TSKMON
-    tskmon_task_dispatch(next_task);
-#endif
-    
-    if (ml_started)
-    {
-        /* all task overrides should be done by now */
-        return;
-    }
-
     // Do nothing unless a new task is starting via the trampoile
     if( context->pc != (uint32_t) task_trampoline )
         return;
 
     thunk entry = (thunk) next_task->entry;
+    
 
-    qprintf("[****] Starting task %x(%x) %s\n", next_task->entry, next_task->arg, next_task->name);
-
-    // Search the task_mappings array for a matching entry point
     extern struct task_mapping _task_overrides_start[];
     extern struct task_mapping _task_overrides_end[];
     struct task_mapping * mapping = _task_overrides_start;
+    
+    qprintf("[****] Starting task %x(%x) %s\n", next_task->entry, next_task->arg, next_task->name);
 
     for( ; mapping < _task_overrides_end ; mapping++ )
     {
-#if defined(POSITION_INDEPENDENT)
-        mapping->replacement = PIC_RESOLVE(mapping->replacement);
-#endif
         thunk original_entry = mapping->orig;
         if( original_entry != entry )
             continue;
@@ -148,6 +99,9 @@ my_task_dispatch_hook(
     }
 }
 
+//TASK_OVERRIDE( gui_main_task, kitor_gui_main_task);
+
+
 /** Call all of the init functions  */
 static void
 call_init_funcs()
@@ -162,11 +116,16 @@ call_init_funcs()
         init_func->entry = PIC_RESOLVE(init_func->entry);
         init_func->name = PIC_RESOLVE(init_func->name);
 #endif
-        DebugMsg( DM_MAGIC, 3,
+        /*DebugMsg( DM_MAGIC, 3,
             "Calling init_func %s (%x)",
             init_func->name,
             (uint32_t) init_func->entry
-        );
+        ); */
+        
+        uart_printf("\nCalling init_func %s (%x)\n",
+            init_func->name,
+            (uint32_t) init_func->entry
+        );  
         thunk entry = (thunk) init_func->entry;
         entry();
     }
@@ -243,6 +202,7 @@ static void backup_rom_task()
 #ifdef CONFIG_HELLO_WORLD
 static void hello_world()
 {
+
     int sig = compute_signature((uint32_t*)SIG_START, 0x10000);
     while(1)
     {
@@ -339,6 +299,7 @@ static void my_big_init_task()
 
     _load_fonts();
 
+
 #ifdef CONFIG_HELLO_WORLD
     hello_world();
     return;
@@ -355,16 +316,15 @@ static void my_big_init_task()
     debug_init();
     call_init_funcs();
     msleep(200); // leave some time for property handlers to run
-
     #if defined(CONFIG_AUTOBACKUP_ROM)
     /* backup ROM first time to be prepared if anything goes wrong. choose low prio */
     /* On 5D3, this needs to run after init functions (after card tests) */
-    task_create("ml_backup", 0x1f, 0x4000, backup_rom_task, 0 );
+    //task_create("ml_backup", 0x1f, 0x4000, backup_rom_task, 0 );
     #endif
 
     /* Read ML config. if feature disabled, nothing happens */
     config_load();
-    
+
     debug_init_stuff();
 
     #ifdef FEATURE_GPS_TWEAKS
@@ -386,6 +346,10 @@ static void my_big_init_task()
         task->entry = PIC_RESOLVE(task->entry);
         task->arg = PIC_RESOLVE(task->arg);
 #endif
+        uart_printf("\nCalling task_create %s (%x)\n",
+            task->name,
+            (uint32_t) task->entry
+        );  
         task_create(
             task->name,
             task->priority,
@@ -457,14 +421,14 @@ void ml_crash_message(char* msg)
 /* called before Canon's init_task */
 void boot_pre_init_task()
 {
-#if !defined(CONFIG_HELLO_WORLD) && !defined(CONFIG_DUMPER_BOOTFLAG)
+//#if !defined(CONFIG_HELLO_WORLD) && !defined(CONFIG_DUMPER_BOOTFLAG)
     // Install our task creation hooks
     qprint("[BOOT] installing task dispatch hook at "); qprintn((int)&task_dispatch_hook); qprint("\n");
     task_dispatch_hook = my_task_dispatch_hook;
     #ifdef CONFIG_TSKMON
     tskmon_init();
     #endif
-#endif
+//#endif
 }
 
 /* called right after Canon's init_task, while their initialization continues in background */
@@ -523,5 +487,3 @@ void boot_post_init_task(void)
 
     return;
 }
-
-

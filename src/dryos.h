@@ -51,6 +51,8 @@
 #include "notify_box.h"
 #include "qemu-util.h"
 
+extern int uart_printf(const char * fmt, ...);
+
 extern float roundf(float x);
 extern float powf(float x, float y);
 

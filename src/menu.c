@@ -44,7 +44,7 @@
 //~ #define CONFIG_MENU_DIM_HACKS
 #undef SUBMENU_DEBUG_JUNKIE
 
-#define DOUBLE_BUFFERING 1
+#define DOUBLE_BUFFERING 0
 
 //~ #define MENU_KEYHELP_Y_POS (menu_lv_transparent_mode ? 425 : 430)
 #define MENU_HELP_Y_POS 435
@@ -243,6 +243,7 @@ int menu_active_and_not_hidden() { return gui_menu_shown() && !( menu_lv_transpa
 static void
 draw_version( void )
 {
+    uart_printf("in draw_version\n");
     bmp_printf(
         FONT( FONT_SMALL, COLOR_WHITE, COLOR_BLUE ),
         0, 0,
@@ -282,7 +283,7 @@ static int get_beta_timestamp()
 static int beta_should_warn()
 {
     int t = get_beta_timestamp();
-    return beta_warn != t;
+    //return beta_warn != t;
 }
 
 static void beta_set_warned()
@@ -2037,6 +2038,8 @@ void color_icon(int x, int y, const char* color)
 
 static void FAST selection_bar_backend(int c, int black, int x0, int y0, int w, int h)
 {
+    uart_printf("in selection_bar_backend\n");
+    return;
     uint8_t* B = bmp_vram();
     #ifdef CONFIG_VXWORKS
     c = D2V(c);
@@ -4626,6 +4629,7 @@ CONFIG_INT("menu.upside.down", menu_upside_down, 0);
 static void
 menu_redraw_do()
 {
+        uart_printf("in menu_redraw_do\n");
         menu_damage = 0;
         //~ g_submenu_width = 720;
         
@@ -4633,13 +4637,16 @@ menu_redraw_do()
         if (sensor_cleaning) return;
         if (gui_state == GUISTATE_MENUDISP) return;
         
+        uart_printf("--> menu_help_active\n");
         if (menu_help_active)
         {
+            uart_printf("--> menu_help_redraw\n");
             menu_help_redraw();
             menu_damage = 0;
         }
         else
         {
+            uart_printf("--> else\n");
             if (!lv) menu_lv_transparent_mode = 0;
             if (menu_lv_transparent_mode && edit_mode) edit_mode = 0;
 
@@ -4682,6 +4689,7 @@ menu_redraw_do()
             }
             //~ prev_z = z;
             
+            uart_printf("--> menus_display\n");
             menus_display( menus, 0, 0 ); 
 
             if (!menu_lv_transparent_mode && !SUBMENU_OR_EDIT && !junkie_mode)
@@ -4696,13 +4704,13 @@ menu_redraw_do()
                 bfnt_draw_char(ICON_ML_Q_BACK, 680, -5, COLOR_WHITE, NO_BG_ERASE);
             }
 
-            if (beta_should_warn()) draw_beta_warning();
+            //if (beta_should_warn()) draw_beta_warning();
             
             #ifdef CONFIG_CONSOLE
             console_draw_from_menu();
             #endif
 
-            if (DOUBLE_BUFFERING)
+            if(false)
             {
                 // copy image to main buffer
                 bmp_draw_to_idle(0);
@@ -4813,28 +4821,37 @@ static struct msg_queue * menu_redraw_queue = 0;
 static void
 menu_redraw_task()
 {
+    uart_printf("in menu_redraw_task\n");
     menu_redraw_queue = (struct msg_queue *) msg_queue_create("menu_redraw_mq", 1);
     TASK_LOOP
     {
         /* this loop will only receive redraw messages */
         int msg;
         int err = msg_queue_receive(menu_redraw_queue, (struct event**)&msg, 500);
-        if (err) continue;
+        if (err) {
+          uart_printf("error from queue, continuing anyway: %08x\n", err);
+          //continue;
+        }
+        else{
+          uart_printf("no error from queue\n");
+        }
         
         if (gui_menu_shown())
         {
-            if (get_halfshutter_pressed())
+            uart_printf("--> gui_menu_shown\n");
+    /*        if (get_halfshutter_pressed())
             {
-                /* close menu on half-shutter */
-                /* (the event is not always caught by the key handler) */
+                uart_printf("--> get_halfshutter_pressed\n");
+
                 gui_stop_menu();
                 continue;
-            }
+            } */
 
             /* make sure to check the canon dialog even if drawing is blocked
              * (for scripts and such that piggyback the ML menu) */
             if (!menu_ensure_canon_dialog())
             {
+                uart_printf("--> !menu_ensure_canon_dialog\n");
                 /* didn't work, close ML menu */
                 gui_stop_menu();
                 continue;
@@ -4842,6 +4859,7 @@ menu_redraw_task()
             
             if (!menu_redraw_blocked)
             {
+                uart_printf("--> !menu_redraw_blocked\n");
                 menu_redraw_do();
             }
         }
@@ -4862,6 +4880,7 @@ menu_redraw()
 static void
 menu_redraw_full()
 {
+    uart_printf("in menu_redraw_full\n");
     if (!DISPLAY_IS_ON) return;
     if (ml_shutdown_requested) return;
     if (menu_help_active) bmp_draw_request_stop();
@@ -5012,6 +5031,7 @@ int handle_ml_menu_touch(struct event * event)
 int
 handle_ml_menu_keys(struct event * event) 
 {
+    uart_printf("in handle_ml_menu_keys %08x\n", event->param);
     if (menu_shown || arrow_keys_shortcuts_active())
         handle_ml_menu_keyrepeat(event);
 
@@ -5025,7 +5045,7 @@ handle_ml_menu_keys(struct event * event)
     // rack focus may override some menu keys
     if (handle_rack_focus_menu_overrides(event)==0) return 0;
     
-    if (beta_should_warn())
+  /*  if (beta_should_warn())
     {
         if (event->param == BGMT_PRESS_SET ||
             event->param == BGMT_MENU ||
@@ -5049,7 +5069,7 @@ handle_ml_menu_keys(struct event * event)
         #endif
         if (event->param != BGMT_PRESS_HALFSHUTTER)
             return 0;
-    }
+    }  */
     
     // Find the selected menu or submenu (should be cached?)
     struct menu * menu = get_current_menu_or_submenu();
@@ -5063,6 +5083,7 @@ handle_ml_menu_keys(struct event * event)
     
     switch( button_code )
     {
+    uart_printf("in switch->button_code\n");
     case BGMT_MENU:
     {
         if (SUBMENU_OR_EDIT || menu_lv_transparent_mode || menu_help_active)
@@ -5096,6 +5117,7 @@ handle_ml_menu_keys(struct event * event)
     #endif
 
     case BGMT_PRESS_HALFSHUTTER: // If they press the shutter halfway
+        uart_printf("--> halfshutter\n");
         //~ menu_close();
         redraw_flood_stop = 1;
         give_semaphore(gui_sem);
@@ -5147,6 +5169,7 @@ handle_ml_menu_keys(struct event * event)
         break;
 
     case BGMT_PRESS_DOWN:
+        uart_printf("--> down\n");
         if (edit_mode && !menu_lv_transparent_mode)
         {
             struct menu_entry * entry = get_selected_menu_entry(menu);
@@ -5177,6 +5200,7 @@ handle_ml_menu_keys(struct event * event)
         break;
 
     case BGMT_PRESS_RIGHT:
+        uart_printf("--> right\n");
         if(EDIT_OR_TRANSPARENT)
         {
             struct menu_entry * entry = get_selected_menu_entry(menu);
@@ -5209,6 +5233,7 @@ handle_ml_menu_keys(struct event * event)
         break;
 
     case BGMT_PRESS_LEFT:
+        uart_printf("--> left\n");
         if(EDIT_OR_TRANSPARENT)
         {
             struct menu_entry * entry = get_selected_menu_entry(menu);
@@ -5487,6 +5512,7 @@ static void close_canon_menu()
 
 static void menu_open() 
 { 
+    uart_printf("in menu_open\n");
     if (menu_shown) return;
 
     
@@ -5515,13 +5541,12 @@ static void menu_open()
     menu_shown = 1;
     //~ menu_hidden_should_display_help = 0;
     if (lv) menu_zebras_mirror_dirty = 1;
-
     piggyback_canon_menu();
     canon_gui_disable_front_buffer(0);
+
     if (lv && EXT_MONITOR_CONNECTED) clrscr();
 
     CancelDateTimer();
-
     menu_redraw_full();
 }
 static void menu_close() 
@@ -5567,7 +5592,7 @@ menu_task( void* unused )
     debug_menu_init();
     
     int initial_mode = 0; // shooting mode when menu was opened (if changed, menu should close)
-    
+    uart_printf("menu_task hello!\n");
     TASK_LOOP
     {
         int keyrepeat_active = keyrepeat &&
@@ -5587,13 +5612,16 @@ menu_task( void* unused )
 
         if( rc == 0 )
         {
+            uart_printf("menu_task: toggle requested\n");
             /* menu toggle request */
             if (menu_shown)
             {
+                uart_printf("menu_task: close menu\n");
                 menu_close();
             }
             else
             {
+                uart_printf("menu_task: open menu\n");
                 menu_open();
                 initial_mode = shooting_mode;
             }
@@ -6077,9 +6105,10 @@ int handle_ml_menu_erase(struct event * event)
         /* allow opening ML menu from anywhere, since the emulation doesn't enter LiveView */
         int gui_state = GUISTATE_IDLE;
         #endif
-
+        uart_printf("-> BGMT_TRASH\n");
         if (gui_state == GUISTATE_IDLE || (gui_menu_shown() && !beta_should_warn()))
         {
+            uart_printf("-> gui_sem\n");
             give_semaphore( gui_sem );
             return 0;
         }
@@ -6100,6 +6129,7 @@ int handle_ml_menu_erase(struct event * event)
 
 int handle_longpress_events(struct event * event)
 {    
+    uart_printf("in handle_longpress_events: %08x\n", event->param);
 #ifdef CONFIG_LONG_PRESS_JOYSTICK_MENU
     /* also trigger menu by a long joystick press */
     switch (event->param)

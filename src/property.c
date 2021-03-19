@@ -176,6 +176,7 @@ prop_update_registration()
 void
 prop_init( void* unused )
 {
+    return;
     prop_reset_registration();
 }
 

@@ -257,3 +257,17 @@ THUMB_FN(0xdf00d365,  fsuDecodePartitionTable) // this is called in one place in
                                                // inlined in 200D?  The decompilation looks weird too, claims it just returns
                                                // the calling param but it clearly twiddles some registers.
                                                // TODO check how ML uses this stub, since the sig has changed.
+
+/** RBA compositor stubs **/
+THUMB_FN(0xe0702070, XCM_SetRefreshDisplay);
+THUMB_FN(0xe0701f4a, XCM_RefreshDisplay);
+
+DATA_PTR(   0x6F2A4, XCM_LayersArr);
+DATA_PTR(   0x6F2BC, XCM_LayersEnableArr);
+DATA_PTR(    0xFE74, XCM_Inititialized);
+DATA_PTR(    0xFE64, XimrContext);
+
+THUMB_FN(0xe00ddf30, XCM_GetOutputChunk);
+THUMB_FN(0xe00dde68, XCM_SetSourceArea);
+THUMB_FN(0xe00dddfe, XCM_SetSourceSurface);
+THUMB_FN(0xe01104c6, XOC_SetLayerEnable);

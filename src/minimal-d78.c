@@ -3,13 +3,9 @@
  * ROM dumper & other experiments
  */
 
-#include "dryos.h"
-
-extern void dump_file(char* name, uint32_t addr, uint32_t size);
-extern void memmap_info(void);
-extern void malloc_info(void);
-extern void sysmem_info(void);
-extern void smemShowFix(void);
+ #include "dryos.h"
+ #include "vram.h"
+ #include "bmp.h"
 
 static void led_blink(int times, int delay_on, int delay_off)
 {
@@ -24,151 +20,216 @@ static void led_blink(int times, int delay_on, int delay_off)
 
 extern int uart_printf(const char * fmt, ...);
 
-#define BACKUP_BLOCKSIZE 0x0010000
+extern void* _alloc_dma_memory(size_t size);
 
 #undef malloc
 #undef free
 #undef _alloc_dma_memory
 #define malloc _alloc_dma_memory
 #define free _free_dma_memory
-extern void * _alloc_dma_memory(size_t);
-extern void _free_dma_memory(void *);
 
-#define FIO_CreateFile _FIO_CreateFile
-extern FILE* _FIO_CreateFile(const char* filename );
+/*
+ * kitor: So I found a compositor on EOSR
+ * Uses up to 6 RGBA input layers, but Canon ever alocates only two.
+ *
+ * Layers are stored from bottom (0) to top (5). Canon uses 0 for GUI
+ * and 1 for overlays in LV mode (focus overlay)
+ *
+ * I was able to create own layer(s) sitting above two Canon ones.
+ * This PoC will alocate layer after Canon ones and use it to draw on screen.
+ *
+ * Tested (briefly) on LV, menus, during recording, playback, also on HDMI.
+ *
+ * The only cavieat that I was able to catch was calling redraw while
+ * Canon code also wanted to redraw screen. Their menu sometimes "jumped"
+ * due to that.
+ *
+ * But since we don't have to redraw utill we want to update the screen -
+ * there's no need to fight with Canon code.
+ *
+ * For drawing own LV overlays it should be enough to disable layers 0 (GUI)
+ * and maybe 1 (AF points, AF confirmation).
+ * LV calls redraw very often, so probably we don't need to call it ourselfs
+ * in that mode.
+ */
 
-#define FIO_GetFileSize _FIO_GetFileSize
-extern int _FIO_GetFileSize(const char * filename, uint32_t * size);
+extern struct MARV** XCM_LayersArr[];
+extern struct MARV** XCM_RendererLayersArr[];
+extern uint32_t* XCM_LayersEnableArr[];
+extern uint8_t** XimrContext;
+extern int*      XCM_Inititialized;
 
-#define FIO_WriteFile _FIO_WriteFile
-extern int _FIO_WriteFile( FILE* stream, const void* ptr, size_t count );
+extern void      XCM_SetRefreshDisplay(int); //0xe0702070
+extern void      XCM_RefreshDisplay();       //0xe0701f4a
 
-#define FIO_RemoveFile _FIO_RemoveFile
-extern int _FIO_RemoveFile(const char * filename);
+extern uint32_t* XCM_GetOutputChunk(uint8_t**,uint32_t);
+extern int       XCM_SetSourceArea(uint8_t**, uint32_t,uint16_t,uint16_t,uint16_t,uint16_t);
+extern int       XCM_SetSourceSurface(uint8_t**,uint32_t, struct MARV*);
+extern int       XOC_SetLayerEnable(uint32_t*,uint32_t, struct MARV*);
 
-extern int FIO_Flush(const char * filename);
+struct MARV *rgb_vram_info = 0x0; //our layer
+int _rgb_vram_layer = 0;
 
-static void backup_region(char *file, uint32_t base, uint32_t length)
+#define BUF_W     960
+#define BUF_H     540
+#define BMP_VRAM_SIZE (BUF_W*BUF_H*4) //since our MARV defines vram as uint8_t
+#define BMP_W     720
+#define BMP_H     480
+#define BMP_W_OFF 120  //not whole buffer is used, only center part
+#define BMP_H_OFF 30
+
+/*
+ * Not sure if sync_caches() call is needed. It was when I was drawing
+ * over Canon buffers, but now when we have our own may be unncesessary.
+ */
+static void surface_redraw(){
+    XCM_SetRefreshDisplay(1);
+    sync_caches();
+    XCM_RefreshDisplay();
+}
+
+/*
+ * This array toggles coresponding layers. What is weird, this has no effect
+ * on XCMStatus command output, they will still be seen as "enabled":
+ *
+ * [Input Layer] No:2, Enabled:1
+ *  VRMS Addr:0x000e0c08, pImg:0x00ea6d54, pAlp:0x00000000, W:960, H:540
+ *  Color:=0x05040100, Range:FULL
+ *  srcX:0120, srcY:0030, srcW:0720, srcH:0480, dstX:0000, dstY:0000
+ */
+static void surface_set_visibility(int state)
 {
-    FILE *handle = NULL;
-    uint32_t size = 0;
-    uint32_t pos = 0;
-    
-    /* already backed up that region? */
-    if((FIO_GetFileSize( file, &size ) == 0) && (size == length) )
-    {
+    if((XCM_Inititialized == 0) || (rgb_vram_info == 0x0)){
         return;
     }
     
-    /* no, create file and store data */
-
-    void* buf = malloc(BACKUP_BLOCKSIZE);
-    if (!buf) return;
-
-    FIO_RemoveFile(file);
-    handle = FIO_CreateFile(file);
-    if (handle)
-    {
-      while(pos < length)
-      {
-         uint32_t blocksize = BACKUP_BLOCKSIZE;
-        
-          if(length - pos < blocksize)
-          {
-              blocksize = length - pos;
-          }
-          
-          /* copy to RAM before saving, because ROM is slow and may interfere with LiveView */
-          memcpy(buf, &((uint8_t*)base)[pos], blocksize);
-          
-          FIO_WriteFile(handle, buf, blocksize);
-          pos += blocksize;
-
-          /* throttle to prevent freezing */
-          msleep(10);
-      }
-      FIO_CloseFile(handle);
-      FIO_Flush(file);
-    }
-    
-    free(buf);
+    XCM_LayersEnableArr[_rgb_vram_layer] = state;
+    //do we want to call it here?
+    surface_redraw();
 }
 
-static void DUMP_ASM dump_task()
+/*
+ * Create a new VRAM (MARV) structure, alloc buffer for VRAM.
+ * Call compositor to enable newly created layer.
+ */
+static int surface_setup()
 {
-    uart_printf("Hello from %s!\n", get_current_task_name());
-
-    /* LED blinking test */
-    led_blink(2, 500, 500);
-
-#if 0
-    void (*SetLED)(int led, int action) = (void *) 0xE0764D59;  /* EOS R 1.1.0 */
-    for (int i = 0; i < 13; i++)
-    {
-        qprintf("LED %d\n", i);
-        SetLED(i, 0);   /* LED ON */
-        msleep(1000);
-        SetLED(i, 1);   /* LED OFF */
-        msleep(1000);
+    //just in case, as there's a variable for that.
+    if(XCM_Inititialized == 0){
+        return 1;
     }
-#endif
 
-    /* print memory info on QEMU console */
-    memmap_info();
-    malloc_info();
-    sysmem_info();
-    smemShowFix();
-
-
-    /* dump ROM (this method gives garbage on M50, why?) */
-    //dump_file("ROM0.BIN", 0xE0000000, 0x02000000);
-    //dump_file("ROM1.BIN", 0xF0000000, 0x02000000); // - might be slow
-
-    /* dump ROM */
-    backup_region("B:/ROM0.BIN", 0xE0000000, 0x02000000);
-    backup_region("B:/ROM1.BIN", 0xF0000000, 0x01000000);
- 
-    /* dump RAM */
-    //dump_file("RAM4.BIN", 0x40000000, 0x40000000); // - large file; decrease size if it locks up
-    //dump_file("DF00.BIN", 0xDF000000, 0x00010000); // - size unknown; try increasing
-
-#ifdef CONFIG_MARK_UNUSED_MEMORY_AT_STARTUP
-    /* wait for the user to exercise the camera a bit */
-    /* e.g. open Canon menu, enter LiveView, take a picture, record a video */
-    led_blink(50, 500, 500);
-
-    /* what areas of the main memory appears unused? */
-    for (uint32_t i = 0; i < 2047; i++)
+    //may differ per camera? R and RP have 6.
+    const int maxLayers = 6;
+    int newLayerID = 0;
+    for(int i = 0; i < maxLayers; i++)
     {
-        /* EOS R: all of the RAM above 0x40000000 is uncacheable */
-        /* our UNCACHEABLE macro is not going to work any more */
-        uint32_t empty = 1;
-        uint32_t start = (i * 1024 * 1024) + 0x40000000;
-        uint32_t end = ((i+1) * 1024 * 1024 - 1) + 0x40000000;
+        if(XCM_LayersArr[i] == 0x0)
+            break;
 
-        for (uint32_t p = start; p <= end; p += 4)
-        {
-            uint32_t v = MEM(p);
-            if (v != 0x124B1DE0 /* RA(W)VIDEO*/)
-            {
-                empty = 0;
-                break;
-            }
-        }
-
-        //DryosDebugMsg(0, 15, "%08X-%08X: %s", start, end, empty ? "maybe unused" : "used");
-        uart_printf("%08X-%08X: %s\n", start, end, empty ? "maybe unused" : "used");
+        newLayerID++;
     }
-#endif
 
-    /* attempt to take a picture */
-    //call("Release");
-    //msleep(2000);
+    uart_printf("Found %d layers\n", newLayerID );
+    if(newLayerID >= maxLayers ){
+        uart_printf("Too many layers, aborting!\n");
+        return 1;
+    }
 
-    /* save a diagnostic log */
-    call("dumpf");
+    /*
+     * In theory XCM can have multiple (4?) XmirContext chunks.
+     * But the only code that Canon uses to call this function has 0 hardcoded.
+     * Thus, at least on R I don't expect more to exists.
+     */
+    uart_printf("XimrContext at 0x%08x\n", XimrContext);
+    uint32_t *pOutChunk = XCM_GetOutputChunk(XimrContext, 0);
+    if(pOutChunk == 0x0)
+    {
+        return 1;
+    }
+    uart_printf("pOutChunk   at 0x%08x\n", pOutChunk);
+
+    struct MARV* pNewLayer = malloc( sizeof( struct MARV ) );
+    uint8_t* pBitmapData = malloc( BMP_VRAM_SIZE );
+    if( ( pNewLayer == 0x0 ) || ( pBitmapData == 0x0 ) )
+    {
+        uart_printf("New layer preparation failed.\n");
+        return 1;
+    }
+
+    //clean up new surface and create a new MARV
+    bzero32( pBitmapData, BMP_VRAM_SIZE );
+
+    /*
+     * Lazy way to create a new MARV structure. Just copy other one,
+     * and replace pointer to bitmap data.
+     *
+     * WARNING: PMEM pointer is also copied this way, should be realocated!
+     */
+    memcpy( pNewLayer, XCM_LayersArr[newLayerID - 1], sizeof( struct MARV ) );
+    pNewLayer->bitmap_data = pBitmapData;
+
+    uart_printf("pNewLayer   at 0x%08x\n", pNewLayer);
+    uart_printf("pBitmapData at 0x%08x\n", pBitmapData);
+
+    //add new layer to compositor layers array
+    XCM_LayersArr[newLayerID] = pNewLayer;
+
+    //enable new layer - just in case (all were enabled by default on R180)
+    XCM_LayersEnableArr[newLayerID] = 0x1;
+
+    //call compositor to add new layer to render
+    XCM_SetSourceArea(XimrContext, newLayerID,
+            BMP_W_OFF, BMP_H_OFF, BMP_W, BMP_H);
+    XCM_SetSourceSurface(XimrContext, newLayerID, pNewLayer);
+    XOC_SetLayerEnable(pOutChunk, newLayerID, pNewLayer);
+
+    //save rgb_vram_info as last step, in case something above fails.
+    rgb_vram_info   = pNewLayer;
+    _rgb_vram_layer = newLayerID;
+
+    return 0;
 }
 
+void rgba_fill(uint32_t color, int x, int y, int w, int h)
+{
+    if(rgb_vram_info == 0x0)
+    {
+      uart_printf("ERROR: rgb_vram_info not initialized\n");
+      return;
+    }
+
+    //Note: buffers are GBRA :)
+    uint32_t* b = rgb_vram_info->bitmap_data;
+    for (int i = y; i < y + h; i++)
+    {
+      uint32_t* row = b + 960*i + x;
+      for(int j = x; j < x + w; j++ ){
+          *row++ = color;
+      }
+    }
+
+    surface_redraw();
+}
+
+static void test_compositor_task(){
+    //call method to init surface
+    while (surface_setup())
+        msleep(500);
+
+    //draw semi-transparent rectangle
+    rgba_fill(0xDEADBEEF, 200, 300, 200, 200);
+    surface_redraw();
+
+    //toggle visibility in a loop
+    while(1)
+    {
+        surface_set_visibility(1);
+        msleep(1000);
+        surface_set_visibility(0);
+        msleep(1000);
+    }
+}
 /* called before Canon's init_task */
 void boot_pre_init_task(void)
 {
@@ -180,11 +241,7 @@ void boot_post_init_task(void)
 {
     msleep(1000);
 
-    task_create("dump_task", 0x1e, 0x1000, dump_task, 0 );
+    task_create("test_compositor", 0x1e, 0x1000, test_compositor_task, 0 );
 }
 
-/* used by font_draw */
-/* we don't have a valid display buffer yet */
-void disp_set_pixel(int x, int y, int c)
-{
-}
+void disp_set_pixel(int x, int y, int c) {}

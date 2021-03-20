@@ -18,9 +18,9 @@ static void led_blink(int times, int delay_on, int delay_off)
     }
 }
 
-extern int uart_printf(const char * fmt, ...);
+extern int uart_printf(const char *fmt, ...);
 
-extern void* _alloc_dma_memory(size_t size);
+extern void *_alloc_dma_memory(size_t size);
 
 #undef malloc
 #undef free
@@ -32,20 +32,23 @@ extern void* _alloc_dma_memory(size_t size);
  * kitor: So I found a compositor on EOSR
  * Uses up to 6 RGBA input layers, but Canon ever alocates only two.
  *
+ * This uses RGBA layers that @coon noticed on RP long time ago.
+ *
  * Layers are stored from bottom (0) to top (5). Canon uses 0 for GUI
  * and 1 for overlays in LV mode (focus overlay)
  *
- * I was able to create own layer(s) sitting above two Canon ones.
- * This PoC will alocate layer after Canon ones and use it to draw on screen.
+ * I was able to create own layer(s), drawn above two Canon pre-alocated ones.
+ * This PoC will alocate one new layer on top of existing two, and use that
+ * buffer to draw on screen.
  *
  * Tested (briefly) on LV, menus, during recording, playback, also on HDMI.
  *
- * The only cavieat that I was able to catch was calling redraw while
- * Canon code also wanted to redraw screen. Their menu sometimes "jumped"
- * due to that.
+ * The only cavieat that I was able to catch was me calling redraw while GUI
+ * also wanted to redraw screen. This "glitched" by showing partialy rendered
+ * frame. Shouldn't be an issue while we have a control over GUI events.
  *
- * But since we don't have to redraw utill we want to update the screen -
- * there's no need to fight with Canon code.
+ * But since we don't have to constantly redraw until we want to update the
+ * screen - there's no need to fight with Canon code.
  *
  * For drawing own LV overlays it should be enough to disable layers 0 (GUI)
  * and maybe 1 (AF points, AF confirmation).
@@ -53,36 +56,97 @@ extern void* _alloc_dma_memory(size_t size);
  * in that mode.
  */
 
-extern struct MARV** XCM_LayersArr[];
-extern struct MARV** XCM_RendererLayersArr[];
-extern uint32_t* XCM_LayersEnableArr[];
-extern uint8_t** XimrContext;
-extern int*      XCM_Inititialized;
+/*
+ * Family of functions new to compositor.
+ * Terminology:
+ * XCM  - X Compositing Manager (?). Referred almost everywhere.
+ * Ximr - X image renderer (?). See XCMStatus EvShell command output.
+ * XOC  - Ximr Output Chunk.
+ */
+extern uint32_t *XCM_GetOutputChunk(
+    uint8_t  **ppXimrContext,
+    uint32_t   outChunkID
+);
+extern uint32_t XCM_SetSourceArea(
+    uint8_t  **ppXimrContext,
+    uint32_t   layerID,
+    uint16_t   x,
+    uint16_t   y,
+    uint16_t   w,
+    uint16_t   h
+ );
+extern uint32_t XCM_SetSourceSurface(
+    uint8_t     **ppXimrContext,
+    uint32_t      layerID,
+    struct MARV  *pSrcMARV
+);
+extern uint32_t XOC_SetLayerEnable(
+    uint32_t    *pOutChunk,
+    uint32_t     layerID,
+    struct MARV *pSrcMARV
+);
 
-extern void      XCM_SetRefreshDisplay(int); //0xe0702070
-extern void      XCM_RefreshDisplay();       //0xe0701f4a
+/*
+ * XCM_SetRefreshDisplay() will just set memory location. 0xFE6C in R180
+ *
+ * Stub names for those two should be changed. 200d, while (probably)
+ * not having a compositor - has similar (less advanced) RefreshDisplay()
+ * function, and memory location being equivalent of what XCM_SetRefreshDisplay
+ * writes into.
+ *
+ * Thus I propose just RefreshDisplay() and use memory location directly
+ * instead of calling XCM_SetRefreshDisplay - for compatibility reasons.
+ */
+extern void XCM_SetRefreshDisplay(int state);
+extern void XCM_RefreshDisplay();
 
-extern uint32_t* XCM_GetOutputChunk(uint8_t**,uint32_t);
-extern int       XCM_SetSourceArea(uint8_t**, uint32_t,uint16_t,uint16_t,uint16_t,uint16_t);
-extern int       XCM_SetSourceSurface(uint8_t**,uint32_t, struct MARV*);
-extern int       XOC_SetLayerEnable(uint32_t*,uint32_t, struct MARV*);
+/*
+ * All the important memory structures.
+ *
+ * XCM_RendererLayersArr holds MARV struct pointers to layers created by
+ *                       RENDERER_InitializeScreen(). Those are layers created
+ *                       by Canon GUI renderer code.
+ * XCM_LayersArr         Like above, but used by XCM for rendering setup.
+ *                       Entries from array above are copied in (what I called)
+ *                       Initialize_Renedrer() after RENDERER_InitializeScreen()
+ *                       and VMIX_InitializeScreen() are done.
+ * XCM_LayersEnableArr   Controls if layer with given ID is displayed or not.
+ *                       Set up just after XCM_LayersArr is populated.
+ * XCM_Inititialized     Variable set by XCM_RefreshDisplay after it initialized
+ *                       XCM (XCM_Reset(), ... ). Init ends with debug message
+ *                       containing "initializeXimrContext".
+ * XimrContext           Internal structure used by XCM for Ximr configuration.
+ */
+extern struct MARV **XCM_RendererLayersArr[];
+extern struct MARV **XCM_LayersArr[];
+extern uint32_t     *XCM_LayersEnableArr[];
+extern uint32_t     *XCM_Inititialized;
+extern uint8_t     **XimrContext;
 
+/*
+ * Just a pointer to MARV four our own layer, plus layer ID for toggling later.
+ */
 struct MARV *rgb_vram_info = 0x0; //our layer
 int _rgb_vram_layer = 0;
 
-#define BUF_W     960
-#define BUF_H     540
-#define BMP_VRAM_SIZE (BUF_W*BUF_H*4) //since our MARV defines vram as uint8_t
-#define BMP_W     720
-#define BMP_H     480
-#define BMP_W_OFF 120  //not whole buffer is used, only center part
-#define BMP_H_OFF 30
+/*
+ * Some defines. Should be renamed to fit bmp.h
+ */
+#define BUF_W          960
+#define BUF_H          540
+#define BMP_VRAM_SIZE  (BUF_W*BUF_H*4) //*4 as vram.h MARV buffer is uint8_t*
+#define BMP_W          720             // not whole buffer is used to display
+#define BMP_H          480             // only center part
+#define BMP_W_OFF      120
+#define BMP_H_OFF       30
+#define XCM_MAX_LAYERS   6             //This is hardcoded on R/RP code
 
 /*
  * Not sure if sync_caches() call is needed. It was when I was drawing
  * over Canon buffers, but now when we have our own may be unncesessary.
  */
-static void surface_redraw(){
+static void surface_redraw()
+{
     XCM_SetRefreshDisplay(1);
     sync_caches();
     XCM_RefreshDisplay();
@@ -99,12 +163,11 @@ static void surface_redraw(){
  */
 static void surface_set_visibility(int state)
 {
-    if((XCM_Inititialized == 0) || (rgb_vram_info == 0x0)){
+    if((XCM_Inititialized == 0) || (rgb_vram_info == 0x0))
         return;
-    }
-    
+
     XCM_LayersEnableArr[_rgb_vram_layer] = state;
-    //do we want to call it here?
+    //do we want to call redraw, or leave it to the caller?
     surface_redraw();
 }
 
@@ -114,15 +177,13 @@ static void surface_set_visibility(int state)
  */
 static int surface_setup()
 {
-    //just in case, as there's a variable for that.
-    if(XCM_Inititialized == 0){
+    //just in case we raced renderer init code.
+    if(XCM_Inititialized == 0)
         return 1;
-    }
 
     //may differ per camera? R and RP have 6.
-    const int maxLayers = 6;
     int newLayerID = 0;
-    for(int i = 0; i < maxLayers; i++)
+    for(int i = 0; i < XCM_MAX_LAYERS; i++)
     {
         if(XCM_LayersArr[i] == 0x0)
             break;
@@ -130,45 +191,46 @@ static int surface_setup()
         newLayerID++;
     }
 
-    uart_printf("Found %d layers\n", newLayerID );
-    if(newLayerID >= maxLayers ){
-        uart_printf("Too many layers, aborting!\n");
+    uart_printf("Found %d layers\n", newLayerID);
+    if(newLayerID >= XCM_MAX_LAYERS)
+    {
+        uart_printf("Too many layers: %d/%d, aborting!\n",
+                newLayerID, XCM_MAX_LAYERS);
         return 1;
     }
 
     /*
-     * In theory XCM can have multiple (4?) XmirContext chunks.
+     * In theory XCM can have multiple (4?) XimrContext chunks.
      * But the only code that Canon uses to call this function has 0 hardcoded.
      * Thus, at least on R I don't expect more to exists.
      */
     uart_printf("XimrContext at 0x%08x\n", XimrContext);
     uint32_t *pOutChunk = XCM_GetOutputChunk(XimrContext, 0);
     if(pOutChunk == 0x0)
-    {
         return 1;
-    }
+
     uart_printf("pOutChunk   at 0x%08x\n", pOutChunk);
 
-    struct MARV* pNewLayer = malloc( sizeof( struct MARV ) );
-    uint8_t* pBitmapData = malloc( BMP_VRAM_SIZE );
-    if( ( pNewLayer == 0x0 ) || ( pBitmapData == 0x0 ) )
+    struct MARV* pNewLayer = malloc(sizeof(struct MARV));
+    uint8_t* pBitmapData = malloc(BMP_VRAM_SIZE);
+    if((pNewLayer == 0x0) || (pBitmapData == 0x0))
     {
         uart_printf("New layer preparation failed.\n");
         return 1;
     }
 
-    //clean up new surface and create a new MARV
-    bzero32( pBitmapData, BMP_VRAM_SIZE );
+    //clean up new surface
+    bzero32(pBitmapData, BMP_VRAM_SIZE);
 
     /*
      * Lazy way to create a new MARV structure. Just copy other one,
-     * and replace pointer to bitmap data.
-     *
-     * WARNING: PMEM pointer is also copied this way, should be realocated!
+     * and update bitmap data and permament memory pointers.
      */
-    memcpy( pNewLayer, XCM_LayersArr[newLayerID - 1], sizeof( struct MARV ) );
+    memcpy(pNewLayer, XCM_LayersArr[newLayerID - 1], sizeof(struct MARV));
     pNewLayer->bitmap_data = pBitmapData;
-
+    //erase PMEM pointer as it is not valid and required anymore.
+    pNewLayer->pmem = 0x0;
+    
     uart_printf("pNewLayer   at 0x%08x\n", pNewLayer);
     uart_printf("pBitmapData at 0x%08x\n", pBitmapData);
 
@@ -200,13 +262,12 @@ void rgba_fill(uint32_t color, int x, int y, int w, int h)
     }
 
     //Note: buffers are GBRA :)
-    uint32_t* b = rgb_vram_info->bitmap_data;
+    uint32_t *b = rgb_vram_info->bitmap_data;
     for (int i = y; i < y + h; i++)
     {
-      uint32_t* row = b + 960*i + x;
-      for(int j = x; j < x + w; j++ ){
-          *row++ = color;
-      }
+        uint32_t *row = b + 960*i + x;
+        for(int j = x; j < x + w; j++)
+            *row++ = color;
     }
 
     surface_redraw();
@@ -244,4 +305,4 @@ void boot_post_init_task(void)
     task_create("test_compositor", 0x1e, 0x1000, test_compositor_task, 0 );
 }
 
-void disp_set_pixel(int x, int y, int c) {}
+void disp_set_pixel(int x, int y, int c){}

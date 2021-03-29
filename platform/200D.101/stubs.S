@@ -226,14 +226,16 @@ THUMB_FN(0xe02b07c3, marv_dcache_clean) // find rgb_vram_info, this function is 
                                         // Function inspects the struct and does dcache_clean
                                         // on the extent of the bitmap_data.  Not referenced
                                         // much.  Possibly only used during init?
+
 THUMB_FN(0xe02ba483, JediDraw) // maybe sends a buffer to 2d accel unit, for output / render?
 THUMB_FN(0xe048f6e7, OsdReverseMode) // "OsdReverseMode" - does this flip the OSD output?
 THUMB_FN(0xe01ef519, XimrExe) // trigger Ximr unit to execute?  Ximr seems to be compositor / renderer related
-THUMB_FN(0xe025e88d, XimrSetLayerVisibility)
+THUMB_FN(0xe025e88d, XimrSetInputLayerVisibility)
 THUMB_FN(0xe025e8ad, XimrSetInputLayerMARV)
-THUMB_FN(0xe025ea65, XimrSetLayer_unk2)
-THUMB_FN(0xe025eaed, maybe_XimrSetLayerColorParams)
-THUMB_FN(0xe025e949, XimrContextInputLayerSetDimensions)
+THUMB_FN(0xe025ea65, XimrSetInputLayer_unk)
+THUMB_FN(0xe025eaed, XimrSetInputLayerColorParams)
+THUMB_FN(0xe025e949, XimrSetInputLayerDimensions)
+
 
 // WRONG but partially found
 DATA_PTR(   0xfd84,  bmp_vram_info) // function e04a044c looks relevant, see refs to 0x3c0 and 0x21c; 960x540
@@ -251,7 +253,6 @@ DATA_PTR(   0xfd80,  rgb_vram_info) // Used in many places, written to in "Initi
 
 DATA_PTR(   0xfda0,  display_output_mode) // on 200D, 1: 960x540, anything else, 720x480
 DATA_PTR(   0xfd7c,  winsys_sem)
-
 
 
 // WRONG

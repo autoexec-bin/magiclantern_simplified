@@ -243,33 +243,101 @@ static void backup_rom_task()
 #endif
 
 #ifdef CONFIG_HELLO_WORLD
-extern void marv_dcache_clean(struct MARV *marv);
-extern void dcache_clean(void *, int size);
-extern void JediDraw(struct MARV *marv, uint8_t buf, int unknown, int size);
-extern void OsdReverseMode(int);
-extern int XimrSetLayerVisibility(void *ximr_context, int, int);
-extern int XimrSetInputLayerMARV(void *ximr_context, int, struct MARV *rgb_vram, int);
-extern int XimrSetLayer_unk2(void *ximr_context, int, int, int, int);
-extern int XimrContextInputLayerSetDimensions(void *ximr_context, int, int, int, int, int, int, int);
-extern int maybe_XimrSetLayerColorParams(void *ximr_context, int, struct MARV *rgb_vram, int, int);
-extern int display_output_mode;
-extern int display_refresh_needed;
+extern int  XimrSetInputLayerVisibility(void *ximr_context, int, int);
+extern int  XimrSetInputLayerMARV(void *ximr_context, int, struct MARV *rgb_vram, int);
+extern int  XimrSetInputLayer_unk(void *ximr_context, int, int, int, int);
+extern int  XimrSetInputLayerColorParams(void *ximr_context, int, struct MARV *rgb_vram, int, int);
+extern int  XimrSetInputLayerDimensions(void *ximr_context, int, int, int, int, int, int, int);
+extern void RefreshVrmsSurface();
+extern int  display_refresh_needed;
 
-static void draw_test_pattern(int colour)
+void *XimrContext = (void *)0xa09a0;
+
+struct MARV *rgb_layer_info;
+
+void surface_redraw()
 {
-    uint8_t *b = bmp_vram();
+    display_refresh_needed = 1;
+    sync_caches();
+    RefreshVrmsSurface();
+}
 
-    // draw a rectangle on the exact visible border
-    for (int y=30; y < 510; y++)
+void rgba_fill(uint32_t color, int x, int y, int w, int h)
+{
+    if(rgb_layer_info == 0x0)
     {
-        bmp_putpixel_fast(b, 120, y, colour);
-        bmp_putpixel_fast(b, 839, y, colour);
+      uart_printf("ERROR: rgb_layer_info not initialized\n");
+      return;
     }
-    for (int x=120; x < 840; x++)
+
+    uint32_t *b = (uint32_t*)rgb_layer_info->bitmap_data;
+    for (int i = y; i < y + h; i++)
     {
-        bmp_putpixel_fast(b, x, 30, colour);
-        bmp_putpixel_fast(b, x, 509, colour);
+        uint32_t *row = b + 960*i + x;
+        for(int j = x; j < x + w; j++)
+            *row++ = color;
     }
+
+    surface_redraw();
+}
+
+static void create_layer()
+{
+    uart_printf("Prep new layer\n");
+    struct MARV* pNewLayer = malloc(sizeof(struct MARV));
+    const int layerId = 1;
+
+    uart_printf("XimrContext at 0x%08x\n", XimrContext);
+    /**
+     * Some constants. Those would be calculated from ones in bmp.h
+     */
+    const uint32_t w         = 960;
+    const uint32_t h         = 540;
+    const uint32_t off_x     = 120;
+    const uint32_t off_y     =  30;
+          uint32_t buff_size = w*h*4; //*4 as it is 32 bit
+    /**
+     * kitor: On Digic 7 buffer has to be aligned to 256 blocks,
+     *        i.e. address must end with 00.
+     */
+    uint8_t* pBitmapData = malloc(buff_size + 0x100);
+
+    if((pNewLayer == NULL) || (pBitmapData == NULL))
+    {
+        uart_printf("New layer preparation failed.\n");
+        while(1);
+    }
+
+    uart_printf("pBitmapData at 0x%08x\n", pBitmapData);
+    pBitmapData = (uint8_t*)((((uintptr_t)pBitmapData + 0x100) >> 8) << 8);
+    uart_printf("pBitmapData aligned at 0x%08x\n", pBitmapData);
+
+    uart_printf("Prep new MARV\n");
+    pNewLayer->signature    = 0x5652414D;  //MARV
+    pNewLayer->bitmap_data  = pBitmapData;
+    pNewLayer->opacity_data = 0x0;
+    pNewLayer->flags        = 0x5040100;   //bitmask (?) for RGBA
+    pNewLayer->width        = w;
+    pNewLayer->height       = h;
+    pNewLayer->pmem         = 0x0;
+
+    uart_printf("pNewLayer   at 0x%08x\n", pNewLayer);
+
+    //clean up new surface
+    bzero32(pBitmapData, 960*540*4);
+
+    XimrSetInputLayerMARV       (XimrContext, layerId, pNewLayer, 0);
+    XimrSetInputLayer_unk       (XimrContext, layerId, 0, 3, 0xff);
+    XimrSetInputLayerColorParams(XimrContext, layerId, pNewLayer, 1, 1);
+    XimrSetInputLayerVisibility (XimrContext, layerId, 1);
+    /**
+     * This might need to be called on every refresh, with corrected two last
+     * arguments (scaling factor?) in case output resolution has changed. 
+     * RefreshVrmsSurface() does that for Canon layer.
+     */
+    XimrSetInputLayerDimensions(XimrContext, layerId, off_x, off_y, w, h, 0, 0);
+
+    rgb_layer_info = pNewLayer;
 }
 
 static void hello_world()
@@ -280,29 +348,17 @@ static void hello_world()
     while (!bmp_vram_raw())
         msleep(100);
 
-//    DryosDebugMsg(0, 15, "==== HELLO WORLD ====");
-    int colour = 4;
+    create_layer();
+
+    rgba_fill(0xC0FFEE00, 120, 30, 10, 10);
+    rgba_fill(0xC0FFEE00, 120, 480+30-10, 10, 10);
+    rgba_fill(0xC0FFEE00, 720+120-10, 30, 10, 10);
+    rgba_fill(0xC0FFEE00, 720+120-10, 480+30-10, 10, 10);
+    rgba_fill(0xDEADBEEF, 200, 300, 200, 200);
     while(1)
     {
-        bmp_printf(FONT_LARGE, 140, 50, "Hello, World!");
-        bmp_printf(FONT_LARGE, 140, 400, "firmware signature = 0x%x", sig);
-
-        if (colour == 15)
-            colour = 4;
-        else
-            colour++;
-        DryosDebugMsg(0, 15, "display mode: %d", display_output_mode);
-        DryosDebugMsg(0, 15, "colour: %d", colour);
-        draw_test_pattern(colour);
-
-        bmp_fill(6, 140, 200, 40, 1);
-
-//        DISP_SetUpdateOSDVram(bmp_vram_info->bitmap_data); // params not fully known.  See 0xe0552dfa for setup
-//        OsdReverseMode(1);  // cool, this works for horizontal flip.  Not tested other values
-
-        refresh_yuv_from_rgb();
-        msleep(200);
-        //info_led_blink(1, 500, 500);
+        msleep(500);
+        info_led_blink(1, 500, 500);
     }
 }
 #endif
@@ -592,5 +648,3 @@ void boot_post_init_task(void)
 
     return;
 }
-
-

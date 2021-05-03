@@ -5,6 +5,14 @@
 #include "dryos.h"
 #include "font_direct.h"
 
+static void blink_once()
+{
+    MEM(CARD_LED_ADDRESS) = LEDON;
+    msleep(500);
+    MEM(CARD_LED_ADDRESS) = LEDOFF;
+    msleep(500);
+}
+
 // block of code needed for basic graphics routines to work
 
 #ifdef CONFIG_VXWORKS
@@ -19,6 +27,13 @@
 /** Returns a pointer to the real BMP vram, as reported by Canon firmware.
  *  Not to be used directly - it may be somewhere in the middle of VRAM! */
 inline uint8_t* bmp_vram_raw() { return bmp_vram_info[1].vram2; }
+#endif
+
+/** We never tried Digic 6 yet. With CHDK progress on XIMR we believe it will
+  * be the same as FEATURE_VRAM_RGBA, but it requires testing. Thus for now,
+  * we will just silently fail */
+#ifdef CONFIG_DIGIC_VI
+inline uint8_t* bmp_vram_raw() { return NULL; }
 #endif
 
 #ifdef FEATURE_VRAM_RGBA
@@ -39,12 +54,7 @@ inline void rgb_vram_init(){
     if (bmp_vram_indexed == NULL)
     { // can't display anything, blink led to indicate sadness
         while(1)
-        {
-            MEM(CARD_LED_ADDRESS) = LEDON;
-            msleep(150);
-            MEM(CARD_LED_ADDRESS) = LEDOFF;
-            msleep(150);
-        }
+          blink_once();
     }
     //initialize buffer with zeros
     memset(bmp_vram_indexed, 0x0, BMP_VRAM_SIZE);
@@ -112,6 +122,12 @@ static void run_test()
 
 static void hello_world()
 {
+    //keep until we figure out DIGIC6 RGB drawing
+    #ifdef CONFIG_DIGIC_VI
+    while(1)
+        blink_once();
+    #endif
+
     /* wait for display to initialize */
     while (!bmp_vram_raw())
     {
@@ -120,11 +136,8 @@ static void hello_world()
 
     while(1)
     {
-        MEM(CARD_LED_ADDRESS) = LEDON;
-        msleep(500);
-        MEM(CARD_LED_ADDRESS) = LEDOFF;
-        msleep(500);
-        
+        blink_once();
+
         font_draw(120, 75, 0x1, 3, "Hello, World!");
         #ifdef FEATURE_VRAM_RGBA
         refresh_yuv_from_rgb();

@@ -33,6 +33,7 @@ inline uint8_t* bmp_vram_raw() { return bmp_vram_info[1].vram2; }
   * be the same as FEATURE_VRAM_RGBA, but it requires testing. Thus for now,
   * we will just silently fail */
 #ifdef CONFIG_DIGIC_VI
+#warning DIGIC 6 drawing is not yet supported
 inline uint8_t* bmp_vram_raw() { return NULL; }
 #endif
 

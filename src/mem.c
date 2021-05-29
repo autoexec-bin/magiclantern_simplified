@@ -204,7 +204,7 @@ static struct mem_allocator allocators[] = {
         .minimum_free_space = 256 * 1024,
     },
 
-#if 1
+#if !defined(CONFIG_DIGIC_678) //kitor FIXME: Doesn't work yet
     /* large buffers (30-40 MB), but you can't even take a picture with one of those allocated */
     {
         .name = "srm_malloc",

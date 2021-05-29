@@ -28,6 +28,63 @@
  #include <consts.h>
  #include <lens.h>
 
+/** MemoryManager own memory pool experiment **/
+static int* pMemoryMgr;
+
+extern int uart_printf(const char * fmt, ...);
+
+/* we expose those for compatibility with mem.c */
+extern void* _AllocateMemory_impl(void*, size_t);
+extern void  _FreeMemory_impl(void*, void*);
+extern int   _GetMemoryInformation_impl(void*, int*, int*);
+extern int   _GetSizeOfMaxRegion_impl(void*,int*);
+
+extern int   MMGR_InitializeRegion(void*, int);
+extern void* MMGR_DEFAULT_POOL;
+extern void* MMGR_REGION_START;
+extern void* MMGR_REGION_END;
+
+void* _AllocateMemory(size_t size)
+{
+    return _AllocateMemory_impl(pMemoryMgr, size);
+}
+
+void _FreeMemory(void* ptr)
+{
+    _FreeMemory_impl(pMemoryMgr, ptr);
+}
+
+int GetMemoryInformation(int* total, int* free)
+{
+    return _GetMemoryInformation_impl(pMemoryMgr, total, free);
+}
+
+int GetSizeOfMaxRegion(int* max_region)
+{
+    return _GetSizeOfMaxRegion_impl(pMemoryMgr, max_region);
+}
+
+/*
+ * Our memory pool needs to be initialized before _mem_init() in ML init task.
+ * I guess it would be better to hook into _mem_init(), but I wanted ability to
+ * run code in post_init_task from platform dir anyway.
+ */
+void platform_post_init()
+{
+    uint32_t MMGR_REGION_SIZE = (uint32_t)&MMGR_REGION_END - (uint32_t)&MMGR_REGION_START + 1;
+    uart_printf("MMGR Region: Start 0x%08x size 0x%08x\n ", &MMGR_REGION_START, MMGR_REGION_SIZE);
+    uint32_t result = MMGR_InitializeRegion(&MMGR_REGION_START, MMGR_REGION_SIZE);
+    if( !result )
+    {
+        uart_printf("MMGR_InitializeRegion failed! pMemoryMgr 0x%08x\n", pMemoryMgr);
+        //fallback to default
+        pMemoryMgr = MMGR_DEFAULT_POOL;
+        uart_printf("pMemoryMgr fallback to 0x%08x\n", pMemoryMgr);
+    }
+    pMemoryMgr = MMGR_REGION_START;
+    uart_printf("pMemoryMgr 0x%08x\n", pMemoryMgr);
+}
+
 /** GUI **/
 //see comments in stub.S
 void gui_init_end(void){ }

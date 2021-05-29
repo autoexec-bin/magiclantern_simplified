@@ -20,7 +20,9 @@ ROMBASEADDR     = 0xE0040000
 #
 # kitor: why 256K? I don't understand yet. It was mentioned in original comment,
 # which wasn't clear at all :)
-RESTARTSTART    = 0x00184630
+
+# kitor: expanded even more. autoexec.bin got too big.
+RESTARTSTART    = 0x00180000
 
 # Cortex A9, binaries loaded as Thumb
 CFLAG_USER = -mthumb -mlong-calls

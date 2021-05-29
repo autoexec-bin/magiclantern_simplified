@@ -30,6 +30,8 @@
 // FIXME: this should follow the conditional definition to handle LV etc, see other cams
 #define GUIMODE_ML_MENU 3
 
+// I can't find any official data. Unofficial say 200k
+#define CANON_SHUTTER_RATING 200000
 
 #define GMT_FUNCTABLE               0xE0938568           //from gui_main_task
 #define GMT_NFUNCS                  0x7                  //size of table above

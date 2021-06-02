@@ -33,11 +33,35 @@
 
 //~ int bmp_enabled = 1;
 
+#ifdef FEATURE_VRAM_RGBA
+static uint8_t *bmp_vram_indexed = NULL;
+static uint8_t *bmp_vram_indexed_back = NULL;
+static struct semaphore * bmp_vram_switch_sem;
+// SJE should this global live in bmp.c?
+uint32_t ml_refresh_display_needed = 0;
+#endif
+
 #ifdef CONFIG_VXWORKS
 
     // inline functions in bmp.h
 
-#else // DryOS
+#elif defined(FEATURE_VRAM_RGBA)
+    uint8_t* BMP_VRAM_START(uint8_t* bmp_buf)
+    {
+        return bmp_buf;
+    }
+
+    uint8_t* bmp_vram_real()
+    {
+        return bmp_vram_indexed + BMP_HDMI_OFFSET;
+    }
+
+    /** Returns a pointer to idle BMP vram */
+    uint8_t* bmp_vram_idle()
+    {
+        return bmp_vram_indexed_back + BMP_HDMI_OFFSET;
+    }
+#else // Digic 4 and 5
 
     // BMP_VRAM_START and BMP_VRAM_START are not generic - they only work on BMP buffer addresses returned by Canon firmware
     uint8_t* BMP_VRAM_START(uint8_t* bmp_buf)
@@ -93,35 +117,15 @@ void bmp_draw_to_idle(int value) { bmp_idle_flag = value; }
 
 #ifdef FEATURE_VRAM_RGBA
 struct MARV *rgb_vram_info = NULL;
-static uint8_t *bmp_vram_indexed = NULL;
 // SJE what is an appropriate priority for this task?
 TASK_CREATE( "redraw_task", refresh_yuv_from_rgb_task, 0, 0x1e, 0x1000 );
 #endif
-// SJE should this global live in bmp.c?
-uint32_t ml_refresh_display_needed = 0;
 
 /** Returns a pointer to currently selected BMP vram (real or mirror) */
 uint8_t * bmp_vram(void)
 {
     #if defined(CONFIG_VXWORKS)
     set_ml_palette_if_dirty();
-    #elif defined(FEATURE_VRAM_RGBA)
-    // SJE FIXME I'm not using BMP_VRAM_START because
-    // we're using a generic malloc'd block so we can't.
-    // It's supposed to adjust where we look inside the 960x540 region to determine
-    // where we base our drawing from, for various bmp_* and other functions.
-    //
-    // It does this by direct inspection of a pointer value to make guesses
-    // about how far into another buffer it is.  Which is nasty, and incompatible
-    // with our malloc'd block in any case.
-    //
-    // With the marv structs having width and height fields, and a mode global
-    // being known (display_output_mode, fda0 on 200D), there must be a nicer way
-    // to dynamically determine the real offset without inspecting the pointer.
-    //
-    // For now, assume 720x480.
-    uint8_t *bmp_buf = bmp_vram_indexed + BMP_HDMI_OFFSET;
-    // bmp_vram_indexed is initialised by bmp_init()
     #else
     uint8_t *bmp_buf = bmp_idle_flag ? bmp_vram_idle() : bmp_vram_real();
     #endif
@@ -134,6 +138,18 @@ uint8_t * bmp_vram(void)
 // 1 = copy idle to BMP
 void bmp_idle_copy(int direction, int fullsize)
 {
+#ifdef FEATURE_VRAM_RGBA
+    take_semaphore(bmp_vram_switch_sem, 0);
+
+    uint8_t* tmp = bmp_vram_indexed;
+    bmp_vram_indexed = bmp_vram_indexed_back;
+    bmp_vram_indexed_back = tmp;
+    //sync_caches(); //kitor: not sure if needed changes anything
+    give_semaphore(bmp_vram_switch_sem);
+
+    ml_refresh_display_needed = 1; //force redraw after buffer swap
+    return;
+#endif
     uint8_t* real = bmp_vram_real();
     uint8_t* idle = bmp_vram_idle();
     ASSERT(real)
@@ -168,6 +184,7 @@ void bmp_idle_copy(int direction, int fullsize)
 #endif
     }
 }
+
 
 #ifdef FEATURE_VRAM_RGBA
 
@@ -226,9 +243,15 @@ static void refresh_yuv_from_rgb_task(void *unused)
                 if(_rgb_vram_info != rgb_vram_info)
                     rgb_vram_info = _rgb_vram_info;
             #endif
+            take_semaphore(bmp_vram_switch_sem, 0);
             refresh_yuv_from_rgb();
+            give_semaphore(bmp_vram_switch_sem);
+            //kitor: do we really want to wait 50ms also after each redraw?
         }
-        msleep(50); // max 20 fps refresh
+        else
+        {
+            msleep(50); // max 20 fps refresh
+        }
     }
 }
 
@@ -1433,13 +1456,17 @@ static void bmp_init(void* unused)
     bvram_mirror_init();
 #ifdef FEATURE_VRAM_RGBA
     bmp_vram_indexed = malloc(BMP_VRAM_SIZE);
+    bmp_vram_indexed_back = malloc(BMP_VRAM_SIZE);
+    bmp_vram_switch_sem = create_named_semaphore( "bmp_vram", 1 );
     // initialise to transparent, this allows us to draw over
     // existing screen, rather than replace it, due to checks
     // in refresh_yuv_from_rgb()
-    if (bmp_vram_indexed != NULL)
-        memset(bmp_vram_indexed, COLOR_TRANSPARENT_BLACK, BMP_VRAM_SIZE);
-    else
+    if((bmp_vram_indexed == NULL) || (bmp_vram_indexed_back == NULL)){
         ASSERT(1);
+      }
+    else{
+        memset(bmp_vram_indexed, COLOR_TRANSPARENT_BLACK, BMP_VRAM_SIZE);
+      }
 #endif
 
     _update_vram_params();

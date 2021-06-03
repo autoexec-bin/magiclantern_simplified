@@ -10,8 +10,7 @@
 // and allowing triggering from a menu context.
 #define FEATURE_DONT_CLICK_ME
 
-// Does not work, property had changed?
-//#define FEATURE_SHOW_SHUTTER_COUNT
+#define FEATURE_SHOW_SHUTTER_COUNT
 
 // working but incomplete, some allocators don't report
 // anything yet as they're faked / not yet found

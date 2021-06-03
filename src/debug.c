@@ -617,7 +617,7 @@ static MENU_UPDATE_FUNC(totalshots_display)
     );
     MENU_SET_WARNING(
         MENU_WARN_ADVICE,
-        "May drift a bit - check after restart for acurate values.");
+        "May drift a bit - check after restart for accurate values.");
 }
 #endif
 

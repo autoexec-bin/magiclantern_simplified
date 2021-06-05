@@ -33,6 +33,8 @@
 // I can't find any official data. Unofficial say 200k
 #define CANON_SHUTTER_RATING 200000
 
+#define DISPLAY_IS_ON               (*(int *)0x9fa0)     //search for "DispOperator_PropertyMasterSetDisplayTurnOffOn (%d)"
+
 #define GMT_FUNCTABLE               0xE0938568           //from gui_main_task
 #define GMT_NFUNCS                  0x7                  //size of table above
 
@@ -56,8 +58,7 @@
 //#define LVAE_ISO_SPEED  (*(uint8_t* )(LVAE_STRUCT+0xXX))  //WRONG, not sure how to follow
 
 
-/* PROPABLY WRONG: Some hacks for early porting */
-#define DISPLAY_IS_ON               1
+
 /* WRONG! */
 #define HALFSHUTTER_PRESSED         0
 /* kitor: I was unable to find any related stuff from 200D

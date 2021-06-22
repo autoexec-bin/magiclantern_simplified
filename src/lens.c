@@ -42,6 +42,7 @@
 #include "picstyle.h"
 #include "focus.h"
 #include "lvinfo.h"
+#include "string.h"
 #include "powersave.h"
 
 // for movie logging
@@ -1233,9 +1234,8 @@ PROP_HANDLER( PROP_LENS_STATIC_DATA )
 
     const struct prop_lens_static_data * lens_data = (void*) buf;
 
-    if( lens_data->lens_name_len > sizeof(lens_info.name) )
-        len = sizeof(lens_info.name);
-    memcpy( (char*)lens_info.name, lens_data->lens_name, len );
+    strncpy( lens_info.name, lens_data->lens_name, sizeof(lens_info.name) );
+    lens_info.name[sizeof(lens_info.name) - 1] = '\0'; //null terminate
 
     lens_info.lens_exists      = lens_data->attached;
     lens_info.raw_aperture_min = lens_data->av_min_spd;

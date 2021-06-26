@@ -36,6 +36,9 @@
 #define PROP_BAT_INFO           0x8003001d
 #define PROP_TFT_STATUS         0x80030015
 #define PROP_LENS_NAME          0x80030021
+#define PROP_LENS_SOMETHING     0x80030022
+//duplicate of PROP_LENS_SOMETHING, name found in R rom.
+//Not replaced as it was already exposed in LUA api
 #define PROP_LENS_ALL_NAME      0x80030022
 
 //~ 5dc doesn't have a PROP_LENS.

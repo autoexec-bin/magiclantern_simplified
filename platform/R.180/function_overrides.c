@@ -33,17 +33,19 @@ static int* pMemoryMgr;
 
 extern int uart_printf(const char * fmt, ...);
 
-/* we expose those for compatibility with mem.c */
+/* MemoryManager initialization stub */
+extern void* MMGR_InitializeRegion(void* region_start, int region_size);
+extern void* MMGR_DEFAULT_POOL;
+extern void* MMGR_REGION_START;
+extern void* MMGR_REGION_END;
+
+/* Internal variants of stubs that take MemoryManager struct */
 extern void* _AllocateMemory_impl(void*, size_t);
 extern void  _FreeMemory_impl(void*, void*);
 extern int   _GetMemoryInformation_impl(void*, int*, int*);
 extern int   _GetSizeOfMaxRegion_impl(void*,int*);
 
-extern int   MMGR_InitializeRegion(void*, int);
-extern void* MMGR_DEFAULT_POOL;
-extern void* MMGR_REGION_START;
-extern void* MMGR_REGION_END;
-
+/* Wrapper functions to be exposed instead of regular stubs. */
 void* _AllocateMemory(size_t size)
 {
     return _AllocateMemory_impl(pMemoryMgr, size);
@@ -71,18 +73,20 @@ int GetSizeOfMaxRegion(int* max_region)
  */
 void platform_post_init()
 {
+    // set default AllocateMemory pool as fallback - in case of init failure
+    // it will behave as "stock" MagicLantern code.
+    pMemoryMgr = MMGR_DEFAULT_POOL;
+
     uint32_t MMGR_REGION_SIZE = (uint32_t)&MMGR_REGION_END - (uint32_t)&MMGR_REGION_START + 1;
-    uart_printf("MMGR Region: Start 0x%08x size 0x%08x\n ", &MMGR_REGION_START, MMGR_REGION_SIZE);
-    uint32_t result = MMGR_InitializeRegion(&MMGR_REGION_START, MMGR_REGION_SIZE);
-    if( !result )
+    void* result = MMGR_InitializeRegion(&MMGR_REGION_START, MMGR_REGION_SIZE);
+    if( result == MMGR_REGION_START )
     {
-        uart_printf("MMGR_InitializeRegion failed! pMemoryMgr 0x%08x\n", pMemoryMgr);
-        //fallback to default
-        pMemoryMgr = MMGR_DEFAULT_POOL;
-        uart_printf("pMemoryMgr fallback to 0x%08x\n", pMemoryMgr);
+        pMemoryMgr = MMGR_REGION_START;
+        uart_printf("MMGR Region: Start 0x%08x size 0x%08x\n ", &MMGR_REGION_START, MMGR_REGION_SIZE);
+        uart_printf("pMemoryMgr 0x%08x\n", pMemoryMgr);
+        return;
     }
-    pMemoryMgr = MMGR_REGION_START;
-    uart_printf("pMemoryMgr 0x%08x\n", pMemoryMgr);
+    uart_printf("MMGR_InitializeRegion failed! pMemoryMgr fall back to 0x%08x\n", pMemoryMgr);
 }
 
 /** GUI **/

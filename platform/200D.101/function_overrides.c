@@ -10,10 +10,19 @@
 #include <config.h>
 #include <consts.h>
 #include <lens.h>
+#include <tasks.h>
 
 void LoadCalendarFromRTC(struct tm *tm)
 {
     _LoadCalendarFromRTC(tm, 0, 0, 16);
+}
+
+int get_task_info_by_id(int unknown_flag, int task_id, void *task_attr)
+{
+    // D678 uses the high half of the ID for some APIs, D45 looks to only
+    // use the low half.  We use the low half as index to find the full value.
+    struct task *task = first_task + (task_id & 0xff);
+    return _get_task_info_by_id(task->taskId, task_attr);
 }
 
 void SetEDmac(unsigned int channel, void *address, struct edmac_info *ptr, int flags)

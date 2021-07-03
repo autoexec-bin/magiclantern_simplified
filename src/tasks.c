@@ -16,8 +16,6 @@
 #include "config.h"
 #include "lens.h"
 
-extern int is_taskid_valid(int, int, void*);
-
 int ml_shutdown_requested = 0;
 
 const char * get_task_name_from_id(int id)
@@ -25,19 +23,24 @@ const char * get_task_name_from_id(int id)
 #if defined(CONFIG_VXWORKS)
 return "?";
 #endif
-    if(id < 0)
-    {
+    if(id < 0) {
         return "?";
     }
-    
-    char* name = "?";
-    int c = id & 0xFF;
+    // This looks like returning local vars, but ISO C99 6.4.5.5 says
+    // string literals have "static storage duration", and 6.2.4.3
+    // defines that as "Its lifetime is the entire execution of the program
+    // and its stored value is initialized only once, prior to program startup"
+    //
+    // So it's okay.
 
-    struct task_attr_str task_attr;
-    int r = is_taskid_valid(1, c, &task_attr); // ok
-    if (r==0) {
-      if (task_attr.name!=0) name=task_attr.name;
-      else name="?";
+    char *name = "?";
+    struct task_attr_str task_attr = {0};
+
+    int r = get_task_info_by_id(1, id & 0xff, &task_attr);
+    if (r == 0) {
+        if (task_attr.name != NULL) {
+            name = task_attr.name;
+        }
     }
     return name;
 }
@@ -134,7 +137,7 @@ int task_check_stack()
 
     /* works, gives the same result as DryOS routine, so... let's just use the DryOS one
      *
-    #ifdef CONFIG_TSKMON
+//#ifdef CONFIG_TSKMON
     tskmon_stack_check(id);
     msleep(50); // wait until the task is rescheduled, so tskmon can check it
     uint32_t stack_used = 0;
@@ -142,10 +145,10 @@ int task_check_stack()
     tskmon_stack_get_max(id, &stack_used, &stack_free);
     bmp_printf(FONT_MED, 0, 0, "free: %d used: %d", stack_free, stack_used);
     return stack_free;
-    #elif !defined(CONFIG_VXWORKS)
+//#elif !defined(CONFIG_VXWORKS)
     */
     
-    int r = is_taskid_valid(1, id, &task_attr);
+    int r = get_task_info_by_id(1, id, &task_attr);
     if (r == 0)
     {
         int free = task_attr.size - task_attr.used;
@@ -171,7 +174,8 @@ MENU_SELECT_FUNC(tasks_toggle_flags)
 
 MENU_UPDATE_FUNC(tasks_print)
 {
-    if (!info->can_custom_draw) return;
+    if (!info->can_custom_draw)
+        return;
 
     info->custom_drawing = CUSTOM_DRAW_THIS_MENU;
     
@@ -193,7 +197,7 @@ MENU_UPDATE_FUNC(tasks_print)
     {
         get_task_info(tasks[i], task_info);
         
-        char* name = (char*) task_info[1]+1;
+        char *name = (char *)task_info[1] + 1;
         char short_name[] = "             \0";
         memcpy(short_name, name, MIN(sizeof(short_name)-2, strlen(name)));
 
@@ -210,7 +214,7 @@ MENU_UPDATE_FUNC(tasks_print)
         bmp_printf(SHADOW_FONT(FONT(FONT_MED, mem_percent < 50 ? COLOR_WHITE : mem_percent < 90 ? COLOR_YELLOW : COLOR_RED, 40)), 
             x, y, "%s: p=%d m=%d%%", 
             short_name, task_info[2], mem_percent);
-        y += font_med.height-1;
+        y += font_med.height - 1;
         if (y > 460)
         {
             x += 360;
@@ -249,27 +253,25 @@ MENU_UPDATE_FUNC(tasks_print)
         );
     y += font_med.height;
 
-    task_id = 1;
-    
     int total_tasks = 0;
-    for (task_id=1; task_id<=(int)task_max; task_id++)
+    for (task_id = 1; task_id <= (int)task_max; task_id++)
     {
-        r = is_taskid_valid(1, task_id, &task_attr); // ok
-        if (r==0)
+        r = get_task_info_by_id(1, task_id, &task_attr);
+        if (r == 0)
         {
             total_tasks++;
 
-            if (task_attr.name!=0)
+            if (task_attr.name != NULL)
             {
-                name=task_attr.name;
+                name = task_attr.name;
             }
             else
             {
-                name="?";
+                name = "?";
             }
 
-            // Canon tasks are named in uppercase (exception: idle); ML tasks are named in lowercase.
-            int is_canon_task = (name[0]  < 'a' || name[0] > 'z' || streq(name, "idle") ||  streq(name, "systemtask"));
+            // Canon tasks are named in uppercase (exceptions: idle, init, init1); ML tasks are named in lowercase.
+            int is_canon_task = (name[0] < 'a' || name[0] > 'z' || streq(name, "idle") || streq(name, "systemtask"));
             if((tasks_show_flags & 1) != is_canon_task)
             {
                 continue;
@@ -320,7 +322,7 @@ MENU_UPDATE_FUNC(tasks_print)
                 task_id, short_name, task_attr.pri, task_attr.wait_id, mem_percent, 0, task_attr.state);
             #endif
 
-            #if defined(CONFIG_60D) || defined(CONFIG_7D) || defined(CONFIG_DIGIC_V)
+            #if defined(CONFIG_60D) || defined(CONFIG_7D) || defined(CONFIG_DIGIC_V) || defined(CONFIG_DIGIC_678)
             y += font_small.height - ((tasks_show_flags & 1) ? 1 : 0); // too many tasks - they don't fit on the screen :)
             #else
             y += font_small.height;
@@ -330,6 +332,8 @@ MENU_UPDATE_FUNC(tasks_print)
                 x += 360;
                 y = 10 + font_med.height;
             }
+            if (x > 710) // there is no more space, give up
+                break;
         }
     }
     bmp_printf(

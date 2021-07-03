@@ -40,6 +40,7 @@ THUMB_FN(0xE06BE23D,  icache_invalidate)      /* loop with MCR p15 c7,c5,1; c7,c
 
 /** Tasks **/
 THUMB_FN(0xDF008CE7,  task_create)            /* used to start TaskMain, GuiMainTask etc */
+THUMB_FN(0xdf008f0b,  task_create_ex)         /* as task_create, but allows selecting CPU for task*/
 THUMB_FN(0xDF00880F,  msleep)                 /* argument is always multiple of 10 */
 DATA_PTR(    0x1028,  current_task)           /* from task_create; pointer to the current task structure */
 DATA_PTR(    0x1010,  current_interrupt)      /* from interrupt handler (VBAR + 0x18); where the interrupt ID is stored */
@@ -126,6 +127,12 @@ THUMB_FN(0xE11C7CF9,  vsnprintf)              /* called near dmstart; references
 // but I wanted to call by name
 THUMB_FN(0xe049e9bf,  SaveVRAM)
 THUMB_FN(0xe05f1c94,  debug_assert) // DRYOS_ASSERT_HANDLER related
+THUMB_FN(0xe0152d8b,  set_rec_mode) // possibly sets Movie mode, e.g., IPB, ALL-I
+THUMB_FN(0xe0152689,  c2rec) // Cave2 - might start mp4 recording?
+THUMB_FN(0xe0152775,  c2stop) // Cave2 - might stop recording?
+THUMB_FN(0xe0153159,  c2install) // Cave2 - looks like an init function
+THUMB_FN(0xe0150fd7,  c2command) // Cave2 - takes a command parameter, see movie_state_name_mappings,
+                                 // 0xe0aa8120 on 200D 1.0.1
 
 // SJE trying to get a substitute vsync callback working for screen refresh
 DATA_PTR(    0xfd78,  winsys_sem_count)
@@ -140,8 +147,8 @@ THUMB_FN(0xe049e96c,  BmpVsyncCallBack)
 // and leaving the stub blank.  50D does this in misc.c (can choose a better name)
 
 // UNSURE or untested
-THUMB_FN(0xdf0031a3,  task_info_by_id) // called indirectly by task_create and functions using string "TASK Name"
-THUMB_FN(0xdf004041,  is_taskid_valid) // e023ccc7 calls this thunked func, the thunked one has right number of params for ML
+THUMB_FN(0xdf0031a3,  get_task_by_id) // called indirectly by task_create and functions using string "TASK Name"
+THUMB_FN(0xdf004041,  _get_task_info_by_id) // e023ccc7 calls this thunked func, the thunked one has right number of params for ML
 NSTUB(    0x4ea4,  dm_names) // in DebugMsg, before the 1st loop target
 NSTUB(   0x1fd7c,  sd_device) // in sdReadBlk, probably 0xe02b6fa2.  Lots of refs
                               // to 0x1fd7c, some to 0x1fd80
@@ -238,7 +245,11 @@ THUMB_FN(0xdf00d365,  fsuDecodePartitionTable) // SJE FIXME wrong, see notes bel
                                                // or preserving ML on the card after an in-cam format.
 
 THUMB_FN(0xe05f67d1,  ShootOlcApp_handler) // near "StopShootOlcApp PopPalette(%d)"
-NSTUB(    0x40f4,  task_max)
+//DATA_PTR(    0x40d0,  first_task) // unsure on naming here.  First item in an array of task structs.
+                                  // Seems to always be "idle" task.
+                                  // (we don't use this, but instead calculate it during early init,
+                                  //  to save backporting this stub for all older cams)
+NSTUB(    0x40f0,  task_max)
 NSTUB(    0xfc88,  gui_task_list) // "pDialog" strings often have refs to 0xfcb4, if so, should be
                                   // around 20 before that? "pDeleteController->psSignature" also distinctive.
                                   // Found in function 0xe0660c90.
@@ -316,7 +327,9 @@ DATA_PTR(    0xe731,  additional_version) // this gets written to in early code.
 //NSTUB(0xFF855290,  SetSamplingRate)
 THUMB_FN(0xe04bb5ad, _prop_request_change)
 //NSTUB(0xFF85E90C,  EnableImagePhysicalScreenParameter)
-//NSTUB(0xFF863E5C,  dm_set_store_level) // called by "dmstore"
+THUMB_FN(0xdf0070c5,  dm_set_store_level) // called by "dmstore"
+                                          // Called in init_task(), shortly before ICU Firmware version string
+                                          // is logged.
 THUMB_FN(0xdf00325d,  task_trampoline)
 //NSTUB(0xFF8898CC,  gui_local_post)
 //NSTUB(0xFF889CA8,  gui_other_post)

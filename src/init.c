@@ -56,6 +56,7 @@ extern void platform_post_init();
 static int _hold_your_horses = 1; // 0 after config is read
 int ml_started = 0; // 1 after ML is fully loaded
 int ml_gui_initialized = 0; // 1 after gui_main_task is started 
+struct task *first_task = 0; // first item in the array of task structs
 
 /**
  * Called by DryOS when it is dispatching (or creating?)
@@ -446,6 +447,15 @@ static void my_big_init_task()
     }
 
     _load_fonts();
+
+    // SJE not sure on best place to do this.  Before HELLO_WORLD is nice
+    // if possible, needs to be after DryOS inits task scheduler.  I assume
+    // that has happened but don't know how to check.
+    //
+    // DryOS keeps task structs in an array, the first task is created
+    // very early and never removed (the "idle" task).  TaskId is index
+    // into the array, so we can find first item knowing any other.
+    first_task = current_task->self - ((current_task->taskId & 0xffff) - 1);
 
 #ifdef CONFIG_HELLO_WORLD
     hello_world();

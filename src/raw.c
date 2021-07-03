@@ -348,6 +348,15 @@ static int (*dual_iso_get_dr_improvement)() = MODULE_FUNCTION(dual_iso_get_dr_im
     -1199, 10000,    2769, 10000,   6108, 10000
 #endif
 
+#ifdef CONFIG_EOSRP // from https://github.com/LibRaw/LibRaw src/tables/colordata.cpp
+    // { LIBRAW_CAMERAMAKER_Canon, "EOS EOSRP", 0, 0,
+    //  { 8608,-2097,-1178,-5425,13265,2383,-1149,2238,5680 } },
+    #define CAM_COLORMATRIX1 \
+     8608, 10000,   -2097, 10000,  -1178, 10000, \
+    -5425, 10000,   13265, 10000,   2383, 10000, \
+    -1149, 10000,   2238,  10000,   5680, 10000
+#endif
+
 #ifdef CONFIG_M50 // from https://github.com/LibRaw/LibRaw src/tables/colordata.cpp
     // { LIBRAW_CAMERAMAKER_Canon, "EOS M50", 0, 0,
     //   { 8532,-701,-1167,-4095,11879,2508,-797,2424,7010 } },
@@ -444,6 +453,10 @@ static int dynamic_ranges[] = {1339, 1278, 1171, 1091, 1004, 920, 840, 733, 636,
 
 #ifdef CONFIG_R
 static int dynamic_ranges[] = {1255, 1237, 1188, 1120, 1045, 964, 883, 785, 685, 599, 507};
+#endif
+
+#ifdef CONFIG_EOSRP
+static int dynamic_ranges[] = {1105, 1086, 1065, 1038, 1000, 936, 846, 773, 676, 585, 499};
 #endif
 
 /** M50 data missing from DxO.

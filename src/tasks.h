@@ -27,6 +27,13 @@
 #include "dryos.h"
 
 #ifdef CONFIG_DIGIC_678
+int get_task_info_by_id(int, int, void*);
+extern int _get_task_info_by_id(int, void*);
+#else
+extern int get_task_info_by_id(int, int, void*);
+#endif
+
+#ifdef CONFIG_DIGIC_678
 // SJE - I believe this has changed because ARMv6 introduced RFE,
 // which Digic7 is using to restore context when task switching.
 // See 200D, 1.0.1, e0274f3a onwards.
@@ -60,23 +67,26 @@
 struct task
 {
 //      type            name            offset, size
-        uint32_t            unknown_01; // 0x00, 4   always 0?
-        uint32_t            unknown_02; // 0x04, 4   stack maybe?  SJE maybe next task in queue?
-        uint32_t        run_prio;       // 0x08, 4   flags?
-        void *          entry;          // 0x0c, 4
+        struct task    *prev_task;      // 0x00, 4   // SJE not sure what these two fields are used for,
+        struct task    *next_task;      // 0x04, 4   // but they're doubly-linked lists of tasks
+        uint32_t        run_prio;       // 0x08, 4
+        void           *entry;          // 0x0c, 4
         uint32_t        arg;            // 0x10, 4
         uint32_t        waitObjId;      // 0x14, 4
         uint32_t            unknown_03; // 0x18, 4
         uint32_t        stackStartAddr; // 0x1c, 4
         uint32_t        stackSize;      // 0x20, 4
-        char *          name;           // 0x24, 4
+        char           *name;           // 0x24, 4
         uint32_t            unknown_04; // 0x28, 4
         uint32_t            unknown_05; // 0x2c, 4
-        uint32_t        self;           // 0x30, 4
+        struct task    *self;           // 0x30, 4
         uint32_t            unknown_06; // 0x34, 4
         uint32_t            unknown_07; // 0x38, 4
         uint32_t            unknown_08; // 0x3c, 4
-        uint32_t        taskId;         // 0x40, 4
+        uint32_t        taskId;         // 0x40, 4 // size 4, but low 16-bits are used as task index.
+                                                   // Comparison against taskId is done with full 32 in *some*
+                                                   // APIs though, at least on D678, so the upper bits
+                                                   // mean something different.
 #ifdef CONFIG_DIGIC_78 // Maybe D678X? Confirmed on 200D, M50, R
         uint32_t            unknown_09; // 0x44, 4
 #endif
@@ -106,6 +116,35 @@ struct task
 };
 
 
+#ifdef CONFIG_DIGIC_678
+// NB, these fields get copied from a struct task,
+// and the effective types seems to change.  I guess this
+// is just down to alignment of the structs (the asm loads a byte,
+// but stores a word).
+//
+// SJE FIXME - I have updated this struct purely from reversing,
+// it is currently untested.  I also haven't audited current ML
+// usage of this struct.  It has new fields now, which old code
+// might not populate, and DryOS might require, etc.
+struct task_attr_str {
+  unsigned int state;           // 0x00
+  unsigned int pri;             // 0x04
+  unsigned int unknown_0b;      // 0x08
+
+  unsigned int entry;           // 0x0c
+  unsigned int args;            // 0x10
+  unsigned int wait_id;         // 0x14
+  unsigned int flags;           // 0x18
+  unsigned int stack;           // 0x1c
+  unsigned int size;            // 0x20
+  unsigned int used;            // 0x24
+  unsigned int cpu_requested;   // 0x28
+  unsigned int cpu_assigned;    // 0x2c
+  unsigned int context;         // 0x30
+  unsigned int unknown_13;      // 0x34
+  char *name;                   // 0x38
+}; // size = 0x3c
+#else
 struct task_attr_str {
   unsigned int entry;
   unsigned int args;
@@ -121,9 +160,12 @@ struct task_attr_str {
   unsigned char fpu;
   unsigned int id;
 }; // size = 0x28
+#endif
+
+extern struct task *first_task;
 
 /** The head of the running task list */
-extern struct task * current_task;
+extern struct task *current_task;
 
 /** Current interrupt ( << 2 on D4/5, exact value on D2/3/6) */
 extern uint32_t current_interrupt;

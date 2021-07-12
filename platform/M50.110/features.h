@@ -20,3 +20,6 @@
 #undef CONFIG_CRASH_LOG
 #undef CONFIG_PROP_REQUEST_CHANGE
 #undef CONFIG_AUTOBACKUP_ROM
+
+//~kitor: add bootdisk menu for easier testing on foreign camera :)
+#define FEATURE_BOOTFLAG_MENU

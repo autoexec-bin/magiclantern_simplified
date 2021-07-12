@@ -17,6 +17,11 @@
 // anything yet as they're faked / not yet found
 #define FEATURE_SHOW_FREE_MEMORY
 
+#define CONFIG_TSKMON
+#define FEATURE_SHOW_TASKS
+#define FEATURE_SHOW_CPU_USAGE
+#define FEATURE_SHOW_GUI_EVENTS
+
 #define CONFIG_ADDITIONAL_VERSION
 #define FEATURE_SCREENSHOT
 

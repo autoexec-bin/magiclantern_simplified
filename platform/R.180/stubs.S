@@ -150,14 +150,17 @@ THUMB_FN(0xE0562ED0,  take_semaphore)                       /* SystemIF::KerSem.
 DATA_PTR(    0xfcb4,  gui_task_list)                        // based on 200d
 THUMB_FN(0xe052f34c,  SetGUIRequestMode)                    // by debug message
 THUMB_FN(0xE004AD80,  gui_main_task)                        // task_create("GuiMainTask"...
-THUMB_FN(0xe0541db6,  dialog_redraw)                        // via xrefs to "pDialog->pSignature == m_pcSignature"
 THUMB_FN(0xe03ae6ea,  gui_massive_event_loop)               // various "GUICMD_"* strings
 THUMB_FN(0xE004AE96,  gui_enqueue_message)                  // via string "warning! QueueLength=" and "GUI::GUI.c" in one function
-DATA_PTR(    0x5304,  gui_main_struct)
 /*
- * kitor: It is referenced in gui_main_task, but struct starts earlier. Real
- * structure start was found via function that calls gui_massive_event_loop.
+ * kitor: gui_main_struct is referenced in gui_main_task, but it starts earlier.
+ * Real start was found via function that calls gui_massive_event_loop.
  */
+DATA_PTR(    0x5304,  gui_main_struct)
+
+ /** Dialog API **/
+ THUMB_FN(0xe0541db6,  dialog_redraw)                        // via xrefs to "pDialog->pSignature == m_pcSignature"
+ THUMB_FN(0xe0524080,  dialog_set_property_str)
 
 /*
  * kitor: gui_init_end DNE on R180. It's the only diff in gui_main_task vs 200d.
@@ -310,3 +313,9 @@ THUMB_FN(0xdf00d365,  fsuDecodePartitionTable) // this is called in one place in
                                                // inlined in 200D?  The decompilation looks weird too, claims it just returns
                                                // the calling param but it clearly twiddles some registers.
                                                // TODO check how ML uses this stub, since the sig has changed.
+
+/**
+ * UNUSED but referenced elsewhere
+ **/
+
+///THUMB_FN(0xe0780cb8,  ctrlman_dispatch_event)

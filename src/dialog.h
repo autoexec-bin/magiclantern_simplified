@@ -29,6 +29,9 @@
 typedef uint32_t gui_event_t;
 
 /** Windowing system elements */
+/*
+ * kitor: completly wrong for R, however unused so I left it as is for now.
+ */
 struct winsys_struct
 {
         void *                  vram_instance; // off 0x00
@@ -61,24 +64,40 @@ extern struct winsys_struct winsys_struct;
 typedef int (*window_callback)( void * );
 
 /** Returned by window_create_maybe() at 0xFFA6BC00 */
+/**
+ * kitor: On R180 struct gained unk_04, related with new arg to window_create()
+ *        unk_01 is related to redraw calls (guess: is redraw needed)
+ *        wx_maybe and wy_maybe on R180 are struct window pointers
+ */
 struct window
 {
-        const char *            type; // "Window Instance" at 0x14920
-        uint32_t                off_0x04;       // initial=0
-        uint32_t                off_0x08;       // initial=0
-        uint32_t                off_0x0c;       // initial=0
-        uint32_t                x;              // off_0x10;
-        uint32_t                y;              // off_0x14;
-        uint32_t                width;          // off_0x18; r5
-        uint32_t                height;         // off_0x1c; r6
-        window_callback         callback;       // off 0x20
-        void *                  arg;            // off_0x24;
-        uint32_t                wx_maybe;       // off_0x28;
-        uint32_t                wy_maybe;       // off_0x2c;
+        const char *            type;         // "Window Instance"
+        uint32_t                unk_01;       // initial=0
+        uint32_t                unk_02;       // initial=0
+        uint32_t                unk_03;       // initial=0
+        uint32_t                x;
+        uint32_t                y;
+        uint32_t                width;
+        uint32_t                height;
+        window_callback         callback;
+        void *                  arg;
+#ifdef CONFIG_R
+        uint32_t                unk_04;
+#endif
+        uint32_t                wx_maybe;
+        uint32_t                wy_maybe;
 };
 
+#ifdef CONFIG_R
+SIZE_CHECK_STRUCT( window, 0x34 );
+#else
 SIZE_CHECK_STRUCT( window, 0x30 );
+#endif
 
+/**
+ * kitor: more like WINSYS_CreateWindowInstance() on new generations
+ * EOS R has one more param at the end. Unconfirmed guess: z-index
+ */
 extern struct window *
 window_create(
         uint32_t                x,
@@ -193,7 +212,10 @@ struct dialog
 
 SIZE_CHECK_STRUCT( dialog, 0xB0 );
 
-
+/*
+ * kitor: New generations call it WINSYS_CreateDialogBox()
+ * EOS R has one more param at the end. Unconfirmed guess: z-index
+ */
 extern struct dialog *
 dialog_create(
         int                     id,      // must be unique?

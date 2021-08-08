@@ -107,6 +107,10 @@ static void exfat_sum(uint32_t* buffer) // size: 12 sectors (0-11)
 int
 bootflag_write_bootblock( void )
 {
+#ifdef CONFIG_R
+    return 0;
+#endif
+
 #if defined(CONFIG_7D)
     struct cf_device * const dev = (struct cf_device *) cf_device[6];
 #elif defined(CONFIG_5D3)

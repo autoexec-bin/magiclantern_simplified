@@ -159,6 +159,100 @@ struct dialog_list
 
 
 /** Dialog box gui elements */
+#ifdef CONFIG_R
+struct dialog {
+    char * type;
+    struct window * window;
+    uint32_t arg4; /* 4th arg to WINSYS_CreateDialogBox, referenced as ID in some prints */
+    struct subscriberClass * hLanguageSubscriber;
+    struct subscriberClass * hTerminateSubscriber; /* disp_sw_controller? */
+    uint32_t refresh_x; /* rectangle to redraw? */
+    uint32_t refresh_y;
+    uint32_t refresh_w;
+    uint32_t refresh_h;
+    uint32_t origin_maybe; /* not sure, referenced as origin in messages */
+    uint32_t pos_x;
+    uint32_t pos_y;
+    uint32_t pos_w;
+    uint32_t pos_h;
+    uint32_t field_0x38;
+    uint32_t field_0x3c;
+    struct gui_task * controller; /* CtrlServ aka gui_task object */
+    uint8_t field_0x44;
+    uint8_t field_0x45;
+    uint8_t field_0x46;
+    uint8_t field_0x47;
+    uint32_t field_0x48;
+    uint32_t * field_0x4c;
+    uint32_t * field_0x50;
+    void * handler;
+    void * handler_arg;
+    uint32_t field_0x5c; /* set in WINSYS_GetFocusedItemIDOfDialogItem_maybe */
+    uint16_t field_0x60;
+    uint16_t field_0x62;
+    uint16_t field_0x64;
+    uint16_t field_0x66;
+    uint32_t field_0x68;
+    uint32_t field_0x6c;
+    uint32_t field_0x70;
+    uint8_t field_0x74;
+    uint8_t field_0x75;
+    uint8_t field_0x76;
+    uint8_t field_0x77;
+    uint32_t field_0x78;
+    uint32_t const_40000000_0; /* set in WINSYS_CreateDialogBox */
+    uint32_t some_w; /* see WINSYS_ResizeDialogBox_maybe */
+    uint32_t some_h;
+    uint32_t id; /* is id ID really? See 0x8, this is referenced as ID */
+    uint32_t level_maybe;
+    uint32_t const_40000000_1; /* set in WINSYS_CreateDialogBox */
+    uint16_t field_0x94;
+    uint8_t field_0x96;
+    uint8_t field_0x97;
+    void * child_list_maybe; /* buffer of (pointer size * count below) */
+    uint child_list_count_maybe; /* search table length %d; +2 from "real" size - see WINSYS_CreateDialogBox */
+    uint32_t reaction_x; /* see WINSYS_SetReactionAreaToDialog */
+    uint32_t reaction_y;
+    uint32_t reaction_w;
+    uint32_t reaction_h;
+    uint32_t field_0xb0;
+    uint32_t field_0xb4;
+    uint32_t field_0xb8;
+    uint32_t field_0xbc;
+    uint32_t field_0xc0;
+    uint16_t field_0xc4;
+    uint8_t field_0xc6;
+    uint8_t field_0xc7;
+    uint8_t field_0xc8;
+    uint8_t field_0xc9;
+    uint8_t field_0xca;
+    uint8_t field_0xcb;
+    uint32_t field_0xcc;
+    uint32_t field_0xd0;
+    uint16_t field_0xd4;
+    uint8_t field_0xd6;
+    uint8_t field_0xd7;
+    uint32_t field_0xd8;
+    uint32_t field_0xdc;
+    uint32_t field_0xe0;
+    uint32_t field_0xe4;
+    uint32_t field_0xe8;
+    uint32_t field_0xec;
+    uint32_t field_0xf0;
+    uint32_t field_0xf4;
+    uint32_t field_0xf8;
+    uint32_t field_0xfc;
+    uint32_t field_0x100;
+    uint32_t field_0x104;
+    uint32_t field_0x108;
+    uint32_t field_0x10c;
+    uint32_t field_0x110;
+    uint32_t field_0x114;
+    uint32_t field_0x118;
+    uint32_t rotationAngle;
+};
+
+#else
 struct dialog
 {
         const char *            type;                   // "DIALOG" at 0x147F8
@@ -211,7 +305,7 @@ struct dialog
 };
 
 SIZE_CHECK_STRUCT( dialog, 0xB0 );
-
+#endif
 /*
  * kitor: New generations call it WINSYS_CreateDialogBox()
  * EOS R has one more param at the end. Unconfirmed guess: z-index

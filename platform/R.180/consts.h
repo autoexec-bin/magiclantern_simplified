@@ -163,6 +163,6 @@
 #define DIALOG_MnCardFormatBegin   (0x1D868) // just before StartMnCardFormatBeginApp it is checked to be DialogClass
 #define DIALOG_MnCardFormatExecute (0x21E14) // similar, MnCardFormatexcuteApp; yes - typos in name.
 
-#define FORMAT_BTN       BGMT_Q
-#define FORMAT_BTN_NAME  "[Q]"
+#define FORMAT_BTN       BGMT_INFO
+#define FORMAT_BTN_NAME  "[INFO]"
 #define FORMAT_STR_LOC   13      //WRONG, taken from 5D3

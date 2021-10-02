@@ -156,7 +156,7 @@ class CPU:
             with open(Globals.file, "rb") as rom_file:
                 offset = self.getFileOffset(self._config["IVT"])
                 rom_file.seek(offset, 0)
-                print("IVC start: 0x{:08x}".format(offset))
+                print("IVT start: 0x{:08x}".format(offset))
                 for i in range(self._lengths["IVT"]):        
                     ptr    = rom_file.read(4)
                     ptr    = int.from_bytes(ptr, byteorder='little')
@@ -415,14 +415,14 @@ configs = {
         # format: dst : (stkip, count), like romcpy.sh
         "romcpy" : {
             0x4000 : (0x11585B0, 0x68C10),
-        }
+        },
     },
 
     "M50_110" : {
         "CPU"               : CPU.DIGIC_8,
         "IVT"               : 0x180b8,
         "IVT_GIC"           : 0x18cac,
-        
+
         # those are in order in single block
         "UnknArr"           : 0xe0dd7848,
         "PackUnpackId"      : 0xe0dd7a70,
@@ -430,7 +430,7 @@ configs = {
         "PackUnpackInfo"    : 0xe0dd7e00,
         "DmacBoomerInfo"    : 0xe0dd7fc8,
         "InterruptHandlers" : 0xe0dd8358,
-        
+
         # those are in order in single block
         "BoomerSelector1"   : 0xe0fc40e0,
         "BoomerInputPort"   : 0xe0fc4464,
@@ -445,7 +445,7 @@ configs = {
         # format: dst : (stkip, count), like romcpy.sh
         "romcpy" : {
             0x4000 : (0x12D7170, 0x511E8),
-        }
+        },
     },
 
     "R_180" : {
@@ -460,12 +460,12 @@ configs = {
         "PackUnpackInfo"    : 0xe0dd5ec4,
         "DmacBoomerInfo"    : 0xe0dd608c,
         "InterruptHandlers" : 0xE0DD641C,
-        
+
         # those are in order in single block
         "BoomerSelector1"   : 0xe0f72e08,
         "BoomerInputPort"   : 0xe0f7318c,
         "BoomerVdKickInfo"  : 0xe0f73510,
-        
+
         "ISRs" : {
             0xe05378d6 | THUMB_FLAG : "EDMAC_ReadISR",
             0xe0537990 | THUMB_FLAG : "EDMAC_WriteISR",
@@ -475,14 +475,14 @@ configs = {
         # format: dst : (stkip, count), like romcpy.sh
         "romcpy" : {
             0x4000 : (0x12C4294, 0x23028),
-        }
+        },
     },
 
     "RP_160" : {
         "CPU"               : CPU.DIGIC_8,
         "IVT"               : 0x1ba48,
         "IVT_GIC"           : 0x1c3ec, 
-        
+
         # those are in order in single block
         "UnkArr"            : 0xe0e1408c,
         "PackUnpackId"      : 0xe0e142b4,
@@ -505,8 +505,38 @@ configs = {
         # format: dst : (stkip, count), like romcpy.sh
         "romcpy" : {
             0x4000 : (0x12F6400, 0x247fc),
-        }
-    }
+        },
+    },
+
+    "250D_100" : {
+        "CPU"               : CPU.DIGIC_8,
+        "IVT"               : 0x19F6C,
+        "IVT_GIC"           : 0x1A910,
+
+        # those are in order in single block
+        "UnkArr"            : 0xe103cce8,
+        "PackUnpackId"      : 0xe103cf10,
+        "DmacInfo"          : 0xe103d040,
+        "PackUnpackInfo"    : 0xe103d2a0,
+        "DmacBoomerInfo"    : 0xe103d468,
+        "InterruptHandlers" : 0xe103d7f8,
+
+        # those are in order in single block
+        "BoomerSelector1"   : 0xe12039e8,
+        "BoomerInputPort"   : 0xe1203d6c,
+        "BoomerVdKickInfo"  : 0xe12040f0,
+
+        "ISRs" : {
+            0xe05c8270 | THUMB_FLAG : "EDMAC_ReadISR",
+            0xe05c8328 | THUMB_FLAG : "EDMAC_WriteISR",
+            0xe05c6886 | THUMB_FLAG : "EDMAC_UnknownISR",
+        },
+
+        # format: dst : (stkip, count), like romcpy.sh
+        "romcpy" : {
+            0x4000 : (0x1549DF4, 0x5ccd0),
+        },
+    },
 }
 
 
@@ -517,7 +547,7 @@ def decodeModeInfo(config):
     ISRArr           = EOS.getInterruptHandlers()
     ISRs             = EOS.getISRs()
     IVT              = EOS.getIVT() 
-    
+
     # DIGIC 8
     if isinstance(EOS, CPU.DIGIC_8):
         PackUnpackId     = EOS.getPackUnpackId()
@@ -552,7 +582,7 @@ def decodeModeInfo(config):
         # skip Boomer for non DIGIC8
         if not isinstance(EOS, CPU.DIGIC_8):
             continue
-        
+
         # PackUnpack
         puid = PackUnpackId[i]    
         mode = PackUnpackInfo[puid][2]
@@ -566,8 +596,6 @@ def decodeModeInfo(config):
             print("PackUnpackInfoMode")
             for flag in mode.keys():
                 print("    {:>2}: {}".format(flag, mode[flag]))
-                
-                
             print()
 
         BoomerID = DmacBoomerInfo[i][0];
@@ -586,7 +614,7 @@ def decodeModeInfo(config):
                 EOS.BoomerVdType[VdType] if VdType in EOS.BoomerVdType.keys() else "__UNKNOWN_{}".format(hex(VdType))))
             print("    addr1                   : {}".format(hex(BoomerVdKickInfo[VdKickId][1])))
             print("    addr2                   : {}".format(hex(BoomerVdKickInfo[VdKickId][2])))
-            
+
             if VdType == 0x1: # Two address arrays are defined only for E_BOOMER_VD_KICK
                 print("BoomerSelector for {}".format(hex(BoomerID)))
                 print("    addr1               : {}".format(hex(BoomerSelector1[VdKickId])))
@@ -602,7 +630,7 @@ def main():
     file_args = parser.add_argument_group("Input file")
     file_args.add_argument("type", choices=configs.keys(), help="ROM type" )
     file_args.add_argument("file", default="ROM1.bin", help="ROM dump to analyze")
-    
+
     parser.add_argument("--debug", "-d", action="store_true", help="Enable debug prints")
     args = parser.parse_args()
 

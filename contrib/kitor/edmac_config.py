@@ -3,9 +3,9 @@
 """
 * 25sep2021, kitor : initial implementation for RP
 * 01oct2021, coon  : RP config added (RP)
-* 02oct2021, kitor : Rewritten to make unversal for Digic 7 and 8, added M50.110, 200D.101, 
+* 02oct2021, kitor : Rewritten to make unversal for Digic 7 and 8, added configs for more cameras
 
-Decode DmacInfo and related structures in Digic 6 and 7
+Decode DmacInfo and related structures in Digic 7 and 8
 See https://www.magiclantern.fm/forum/index.php?topic=26249.0
 """
 
@@ -587,7 +587,6 @@ def decodeModeInfo(config):
         puid = PackUnpackId[i]    
         mode = PackUnpackInfo[puid][2]
         mode = EOS.PackUnpackModeFlags.getSetFlags(mode)
-        #tmp = EOS.PackUnpackModeFlags[mode] if mode in EOS.PackUnpackModeFlags.keys() else "__UNKNOWN_{}".format(mode)
         if mode:
             print("PackUnpackInfo")
             print("    PackUnpackId      : {}".format(puid))

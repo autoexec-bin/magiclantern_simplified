@@ -153,9 +153,9 @@ THUMB_FN(    0x2f3a,  msg_queue_count)                      // educated guess ba
 THUMB_FN(0xfe5486ae,  AllocateMemoryResource)               // Assert m_pfAllocMemoryCBR
 THUMB_FN(0xfe5486dc,  AllocateContinuousMemoryResource)     // Assert m_pfContAllocMemoryCBR
 THUMB_FN(0xfe548782,  FreeMemoryResource)                   // Assert m_pfFreeMemoryCBR
-// SRM specific; disabled using CONFIG_MEMORY_SRM_NOT_WORKING
-//THUMB_FN(0xfe3f73ba,  SRM_AllocateMemoryResourceFor1stJob)  // via debug message with function name (after call). Function uses RscMgr strings
-    //THUMB_FN(0xe04e7590,  SRM_FreeMemoryResourceFor1stJob)      //
+// SRM specific
+THUMB_FN(0xfe3f73ba,  SRM_AllocateMemoryResourceFor1stJob)  // via debug message with function name (after call). Function uses RscMgr strings
+THUMB_FN(0xfe3f970a,  SRM_FreeMemoryResourceFor1stJob)      // used in functions related to deleting Skelton jobs
 // MemorySuite, MemoryChunk
 THUMB_FN(0xfe44167e,  ConcatMemorySuite)                    // Via debug msg with fn name (after call). Not used by ML, but utilizes functions below:
 THUMB_FN(0xfe440dbc,  GetFirstChunkFromSuite)               // In ConcatMemorySuite(), First function called.

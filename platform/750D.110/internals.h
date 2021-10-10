@@ -10,4 +10,4 @@
 
 /** disable SRM for early port
  */
-#define CONFIG_MEMORY_SRM_NOT_WORKING
+//#define CONFIG_MEMORY_SRM_NOT_WORKING

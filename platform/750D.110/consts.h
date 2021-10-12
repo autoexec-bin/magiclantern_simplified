@@ -22,8 +22,12 @@
 
 #define GUIMODE_PLAY 2
 #define GUIMODE_MENU 3
-// FIXME: this should follow the conditional definition to handle LV etc, see other cams
-#define GUIMODE_ML_MENU 2
+
+// In bindGUIEventFromGUICBR, look for "LV Set" => arg0 = 8
+// Next, in SetGUIRequestMode, look at what code calls NotifyGUIEvent(8, something)
+// skip RECORDING variant for now
+#define GUIMODE_ML_MENU (lv ? 86 : 2)
+//#define GUIMODE_ML_MENU (RECORDING ? 0 : lv ? 86 : 2)
 
 // I can't find any official data. Unofficial say 100k
 #define CANON_SHUTTER_RATING 100000

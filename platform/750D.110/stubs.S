@@ -168,7 +168,7 @@ THUMB_FN(0xfe440f4c,  DeleteMemorySuite)                    // DebugMsg "DeleteM
 
 /** Uncategorized **/
 DATA_PTR(   0x2e06c,  sd_device)                            // From function that references "SD_DeviceCreate:" TODO: check if stryct changed like in R
-THUMB_FN(0xfe5087c6,  _LoadCalendarFromRTC)                 // "Private" as it now has more arguments, needs a wrapper.
+THUMB_FN(0xfe614f8c,  _LoadCalendarFromRTC)                 // "Private" as it now has more arguments, needs a wrapper.
 THUMB_FN(0xfe613866,  ErrForCamera_handler)                 // ERR70, ERR80 etc (DlgErrForCamera.c)
 
 /** Properties **/

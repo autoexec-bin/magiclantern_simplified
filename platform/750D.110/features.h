@@ -21,6 +21,7 @@
 
 // enable global draw
 #define FEATURE_GLOBAL_DRAW
+#define FEATURE_CROPMARKS
 
 // explicitly disable stuff that don't work or may break things
 #undef CONFIG_CRASH_LOG

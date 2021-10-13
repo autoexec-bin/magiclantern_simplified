@@ -120,6 +120,8 @@
     //#define MVR_LAST_FRAME_SIZE (*(int*)(512 + MVR_752_STRUCT))
     #define MVR_BYTES_WRITTEN MEM((212 + MVR_190_STRUCT))
 
+    #define IMGPLAY_ZOOM_LEVEL_ADDR (0x2CBC) //wrong, code looks different
+
 //address of XimrContext structure to redraw in FEATURE_VRAM_RGBA
 //0x78360 + 0x10 is pointer to XimrContext struct
 #define XIMR_CONTEXT ((void*)0x78370)

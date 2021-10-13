@@ -251,17 +251,18 @@ struct dialog {
     uint32_t field_0x118;
     uint32_t rotationAngle;
 };
-#elif defined(CONFIG_750D)
+#elif defined(CONFIG_DIGIC_VI) || defined(CONFIG_DIGIC_VII)
+// confirmed on 750D, 200D
 struct dialog {
-    uint32_t type; //class, pSignature
+    const char * type; //class, pSignature
     void * hWindow;
     uint32_t id;
-    uint32_t * hLanguageSubscriber;
+    void * hLanguageSubscriber;
     uint8_t field_0x10;
     uint8_t field_0x11;
     uint8_t field_0x12;
     uint8_t field_0x13;
-    uint32_t * hTerminateSubscriber;
+    void * hTerminateSubscriber;
     uint32_t field_0x18;
     uint32_t field_0x1c;
     uint32_t field_0x20;
@@ -271,7 +272,7 @@ struct dialog {
     uint32_t field_0x30;
     uint32_t field_0x34;
     uint32_t field_0x38;
-    uint controller;
+    void * controller;
     uint8_t field_0x40;
     uint8_t field_0x41;
     uint8_t field_0x42;
@@ -300,7 +301,7 @@ struct dialog {
     uint32_t * field_0x5c;
     uint32_t * field_0x60;
     void * handler;
-    uint32_t handler_arg;
+    void * handler_arg;
     uint32_t field_0x6c;
     uint16_t field_0x70;
     uint16_t field_0x72;
@@ -323,7 +324,7 @@ struct dialog {
     uint16_t field_0xa4;
     uint8_t field_0xa6;
     uint8_t field_0xa7;
-    uint32_t child_list_maybe;
+    void * child_list_maybe;
     int child_list_count_maybe;
     uint32_t field_0xb0;
     uint32_t field_0xb4;

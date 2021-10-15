@@ -91,7 +91,7 @@ void prop_add_handler (uint32_t property, void *handler)
     if (
         property == PROP_ISO || property == PROP_MVR_REC_START
         // Does not crash D67, but crashes R in LV
-        #if defined(CONFIG_DIGIC_VII)
+        #ifdef CONFIG_DIGIC_VIII
         || property == PROP_LV_AFFRAME
         #endif
         )

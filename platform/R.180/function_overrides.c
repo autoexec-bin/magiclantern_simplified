@@ -77,7 +77,9 @@ void platform_post_init()
     // set default AllocateMemory pool as fallback - in case of init failure
     // it will behave as "stock" MagicLantern code.
     pMemoryMgr = MMGR_DEFAULT_POOL;
-
+    
+    // Disable for now, region is uncached - causes perf problems in LV
+    return;
     uint32_t MMGR_REGION_SIZE = (uint32_t)&MMGR_REGION_END - (uint32_t)&MMGR_REGION_START + 1;
     void* result = MMGR_InitializeRegion(&MMGR_REGION_START, MMGR_REGION_SIZE);
     if( result == MMGR_REGION_START )

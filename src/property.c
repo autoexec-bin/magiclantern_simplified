@@ -321,13 +321,13 @@ static void prop_reset_ack(uint32_t property)
 
 void prop_request_change(unsigned property, const void* addr, size_t len)
 {
-#ifdef CONFIG_PROP_REQUEST_CHANGE
+#if defined(CONFIG_PROP_REQUEST_CHANGE) || defined (CONFIG_LIMITED_PROP_REQUEST_CHANGE)
 
-	#if defined(CONFIG_40D)
-	if (property != PROP_AFPOINT) {
-		return;
-	}
-	#endif
+    #if defined(CONFIG_40D)
+    if (property != PROP_AFPOINT) {
+        return;
+    }
+    #endif
 
     #if defined(CONFIG_DIGIC_V) && defined(CONFIG_FULLFRAME)
     if (property == PROP_VIDEO_MODE) // corrupted video headers on 5D3
@@ -369,7 +369,17 @@ ok:
 
     /* call Canon stub */
     extern void _prop_request_change(unsigned property, const void* addr, size_t len);
-    _prop_request_change(property, addr, len);
+    #ifdef CONFIG_LIMITED_PROP_REQUEST_CHANGE
+    if(property == PROP_LV_LENS){
+        DryosDebugMsg(0, 15, "_prop_request_change %08x", property);
+        _prop_request_change(property, addr, len);
+    }
+    else{
+        DryosDebugMsg(0, 15, "_prop_request_change %08x dennied", property);
+    }
+    #else
+        _prop_request_change(property, addr, len);
+    #endif
 #endif
 }
 

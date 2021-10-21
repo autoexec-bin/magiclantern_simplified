@@ -23,6 +23,9 @@
 #define FEATURE_GLOBAL_DRAW
 #define FEATURE_CROPMARKS
 
+// enable selected properties change
+#define CONFIG_LIMITED_PROP_REQUEST_CHANGE
+
 // explicitly disable stuff that don't work or may break things
 #undef CONFIG_CRASH_LOG
 #undef CONFIG_PROP_REQUEST_CHANGE
